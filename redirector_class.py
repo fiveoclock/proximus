@@ -60,22 +60,27 @@ def send_mail(subject, body):
    # code here
    global settings, user
    smtp = smtplib.SMTP(settings['smtpserver'])
+   msg = MIMEText(body)
    msg['Subject'] = subject
    msg['From'] = "ProXimus"
    msg['To'] = user['email']
-   msg = MIMEText(body)
-   smtp.sendmail(settings['admin_email'], user_email, msg.as_string())
+   smtp.sendmail(settings['admin_email'], user['email'], msg.as_string())
    smtp.close()
 
 
 def deny_mail_user():
    global user, request
-   send_mail('Site '+sitename+' has been blocked', "Dear User! \n\nYour request to https://"+sitename+" has been blocked. \n\nIf you need access to this page please contact your Administrator.\n\nProXimus")
-   deny()
+   if request['protocol'] == "ssl" :
+      sheme = "https"
+   else :
+      sheme = "http"
+   send_mail('Site '+request['sitename']+' has been blocked', "Dear User! \n\nYour request to "+sheme+"://"+request['sitename']+" has been blocked. \n\nIf you need access to this page please contact your Administrator.\n\nProXimus")
+   return deny()
 
 
 def parse_line(line):
    global request, user
+   uparse, ujoin = urlparse.urlparse , urlparse.urljoin
    url,src_address,ident,method,dash=string.split(line)
    # scheme://host/path;parameters?query#fragment
    (scheme,host,path,parameters,query,fragment) = uparse(url)
@@ -139,7 +144,7 @@ def check_request(passed_settings, line):
 
    # allow access to to proximuslog website
    if request['sitename'] == settings['redirection_host'] :
-      grant()
+      return grant()
  
    #
    # check if host is blocked globally
@@ -192,7 +197,7 @@ def check_request(passed_settings, line):
       if row[2] == "ALLOW" :
          break
       elif row[2].startswith("REDIRECT") :
-         redirection_method = row[2]
+         request['redirection_method'] = row[2]
          # check if user has already added site to dynamic rules
          db_cursor.execute ("SELECT sitename \
                            FROM logs \
@@ -209,6 +214,8 @@ def check_request(passed_settings, line):
          else :
             break
          return redirect()
+      elif row[2] == "DENY_MAIL" :
+         return deny_mail_user()
       elif row[2] == "DENY" :
          return deny()
       elif row[2] == "LEARN" :
@@ -220,29 +227,12 @@ def check_request(passed_settings, line):
                               AND \
                                  ( sitename = %s OR \
                                  %s RLIKE CONCAT('.*[.full-stop.]', sitename ) ) \
-                           ", (user_id, sitename, sitename))
+                           ", (user['id'], request['sitename'], request['sitename']))
          dyn = db_cursor.fetchone()
          if (dyn == None) :
-            sitename_sav = re.sub("^www\.", "", sitename)
             db_cursor.execute ("INSERT INTO logs (sitename, ipaddress, user_id, location_id, protocol, source) \
-                              VALUES (%s, %s, %s, %s, %s, %s) ", (sitename_sav, src_address, user_id, user_loc_id, protocol, "LEARN"))
+                              VALUES (%s, %s, %s, %s, %s, %s) ", (request['sitename_save'], request['src_address'], user['id'], user['loc_id'], request['protocol'], "LEARN"))
             dyn = db_cursor.fetchone()
 
-   
-    #for row in rows:
-    #  #print row[0]
-    #  if (row[0] == sitename) or re.search('.*\.'+row[0], sitename):
-    #     #print row[1]
-    #     if (protocol == row[1]) or (row[1] == '*') :
-    #        #print row[2]
-    #        if row[2] == "DENY" :
-    #           return redirect(sitename,protocol,url)+metainfo
-    #        elif row[2] == "ALLOW" :
-    #           break
- 
-
-   #newurl = urlparse.urlunparse((scheme,host,path,parameters,query,fragment))
-   #return " ".join((newurl,src_address,ident,method,dash))
-   return " "
-
+   return ""
 
