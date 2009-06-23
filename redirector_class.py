@@ -11,11 +11,11 @@ from email.MIMEText import MIMEText
 
 uparse, ujoin = urlparse.urlparse , urlparse.urljoin
 
-proxy = ""
-location = ""
+global settings
+settings = []
+
 redirection_method = ""
 user_email = ""
-email_admin = ""
 
 def log(s):
     f = open("/var/log/squid/redirector_class.log","a")
@@ -40,16 +40,14 @@ def redirect(sitename,protocol,url,user_id,src_address,loc_id):
 
    if protocol == "ssl" :
       if redirection_method == "REDIRECT_HTTP" :
-         return "302:http://%s/proximuslog/logs/confirm/site:%s/proto:%s/ip:%s/uid:%s/locid:%s/url:%s" % (proxy, sitename_sav, protocol, src_address, user_id, loc_id, base64.b64encode("https://"+sitename))
+         return "302:http://%s/proximuslog/logs/confirm/site:%s/proto:%s/ip:%s/uid:%s/locid:%s/url:%s" % (settings['redirection_host'], sitename_sav, protocol, src_address, user_id, settings['location_id'], base64.b64encode("https://"+sitename))
       
       elif redirection_method == "REDIRECT_SSL" :
          # the webserver there can read the requested host + requested uri and redirect to proximuslog 
          return "srv-vie-wtrash.vie.mm-karton.com:443"
  
       elif redirection_method == "REDIRECT_SSL_MAIL" :
-         smtp = smtplib.SMTP("localhost")
-         email_admin = "root@mm-karton.com"
-
+         smtp = smtplib.SMTP(settings['smtpserver'])
 
          msg = MIMEText("Dear User! \n\nYour request to https://"+sitename+" has been blocked. \n\nIf you need access to this page please contact your Administrator.\n\nProXimus")
 
@@ -63,10 +61,10 @@ def redirect(sitename,protocol,url,user_id,src_address,loc_id):
          msg['To'] = user_email
 
          #smtp.sendmail(email_admin, user_email, msg.as_string())
-         smtp.sendmail("root@mm-karton.com", user_email, msg.as_string())
+         smtp.sendmail(settings['admin_email'], user_email, msg.as_string())
          smtp.close()
 
-         return "302:http://%s/proximuslog/logs/confirm/site:%s/proto:%s/ip:%s/uid:%s/locid:%s/url:%s" % (proxy, sitename_sav, protocol, src_address, user_id, loc_id, base64.b64encode("https://"+sitename))
+         return "302:http://%s/proximuslog/logs/confirm/site:%s/proto:%s/ip:%s/uid:%s/locid:%s/url:%s" % (settings['redirection_host'], sitename_sav, protocol, src_address, user_id, settings['location_id'], base64.b64encode("https://"+sitename))
       
       elif redirection_method == "REDIRECT_SSL_GEN" :
          # generate a SSL certificate on the fly and present it to the requesting browser
@@ -75,28 +73,22 @@ def redirect(sitename,protocol,url,user_id,src_address,loc_id):
       
       else :
          #default
-         return "302:http://%s/proximuslog/logs/confirm/site:%s/proto:%s/ip:%s/uid:%s/locid:%s/url:%s" % (proxy, sitename_sav, protocol, src_address, user_id, loc_id, base64.b64encode("https://"+sitename))
+         return "302:http://%s/proximuslog/logs/confirm/site:%s/proto:%s/ip:%s/uid:%s/locid:%s/url:%s" % (settings['redirection_host'], sitename_sav, protocol, src_address, user_id, settings['location_id'], base64.b64encode("https://"+sitename))
 
    else:
       #sitename_sav = re.sub("^www.", "", sitename)
-      return "302:http://%s/proximuslog/logs/confirm/site:%s/proto:%s/ip:%s/uid:%s/locid:%s/url:%s" % (proxy, sitename_sav, protocol, src_address, user_id, loc_id, base64.b64encode(url))
+      return "302:http://%s/proximuslog/logs/confirm/site:%s/proto:%s/ip:%s/uid:%s/locid:%s/url:%s" % (settings['redirection_host'], sitename_sav, protocol, src_address, user_id, settings['location_id'], base64.b64encode(url))
 
 
-
-#return "302:http://%s/proximuslog/logs/confirm/site:%s/proto:%s/ip:%s/uid:%s/locid:%s/url:%s" % (proxy, sitename_sav, protocol, src_address, user_id, loc_id, base64.urlsafe_b64encode(url))
-
-
-def check_request(db_cursor, redirection_host, location_id, line):
+def check_request(db_cursor, passed_settings, line):
    url,src_address,ident,method,dash=string.split(line)
    # scheme://host/path;parameters?query#fragment
    (scheme,host,path,parameters,query,fragment) = uparse(url)
    metainfo = " ".join(("",src_address,ident,method,dash))
 
-   global proxy, location, redirection_method, user_email
+   global settings, user_email, redirection_method
+   settings = passed_settings
    
-   proxy = redirection_host
-   location = location_id
-
    # remove "/-" from source ip address
    src_address = re.sub("/.*", "", src_address)
 
@@ -122,7 +114,7 @@ def check_request(db_cursor, redirection_host, location_id, line):
    #src_address = escape(src_address)
 
    # allow access to to proximuslog website
-   if sitename == proxy : 
+   if sitename == settings['redirection_host'] : 
       return ""
    
 

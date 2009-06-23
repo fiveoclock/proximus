@@ -42,23 +42,22 @@ class SquidRedirector:
       # Get the fully-qualified name.
       hostname = socket.gethostname()
       fqdn_hostname = socket.getfqdn(hostname)
-      #print "Fully-qualified name:", socket.getfqdn(hostname)
       self.db_connect()
 
       # Get relevant proxy settings
-      db_cursor.execute ("SELECT location_id, redirection_host \
+      db_cursor.execute ("SELECT location_id, redirection_host, smtpserver, admin_email \
                            FROM proxy_settings \
                            WHERE \
                                  fqdn_proxy_hostname = %s \
          ", ( fqdn_hostname ))
 
-      settings = db_cursor.fetchone()
-      location_id = settings[0]
-      redirection_host = settings[1]
+      query = db_cursor.fetchone()
+
+      settings = {'location_id':query[0], 'redirection_host':query[1], 'smtpserver':query[2], 'admin_email':query[3]}
 
       line = self._readline()
       while line:
-         response = redirector_class.check_request(db_cursor, redirection_host, location_id, line)
+         response = redirector_class.check_request(db_cursor, settings, line)
          self._log("request: " + line)
          self._log("response: " + response + "\n")
          self._writeline(response)
