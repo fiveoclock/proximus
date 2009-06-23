@@ -11,12 +11,23 @@ import socket
 class SquidRedirector:
    def db_connect(self):
       self._log("started")
-      conn = MySQLdb.connect (host = "mysql-lga.mm-karton.com",
-         user = "proximusadmin",
-         passwd = "proximus",
-         db = "db_proximusgate")
       global db_cursor
-      db_cursor = conn.cursor ()
+
+      try:
+         conn = MySQLdb.connect (host = "mysql-lga.mm-karton.com",
+            user = "proximusadmin",
+            passwd = "proximus",
+            db = "db_proximusgate")
+         db_cursor = conn.cursor ()
+      except MySQLdb.Error, e:
+         error_msg = "ERROR: please make sure that database settings are correct; current settings: \n \
+            User: "+"todo"+"\n \
+            Database: "+"todo"+"\n"
+
+         self._log(error_msg)
+         self._writeline(error_msg)
+         sys.exit(1)
+
 
    def __init__(self):
       self.stdin   = sys.stdin
@@ -44,16 +55,22 @@ class SquidRedirector:
       fqdn_hostname = socket.getfqdn(hostname)
       self.db_connect()
 
-      # Get relevant proxy settings
-      db_cursor.execute ("SELECT location_id, redirection_host, smtpserver, admin_email \
+      # Get relevant proxy settings and catch error if no settings exist in db
+      try:
+         db_cursor.execute ("SELECT location_id, redirection_host, smtpserver, admin_email \
                            FROM proxy_settings \
                            WHERE \
-                                 fqdn_proxy_hostname = %s \
-         ", ( fqdn_hostname ))
+                                 fqdn_proxy_hostname = %s", ( fqdn_hostname ))
+         query = db_cursor.fetchone()
+         settings = {'location_id':query[0], 'redirection_host':query[1], 'smtpserver':query[2], 'admin_email':query[3], 'db_cursor':db_cursor }
+      except TypeError:
+         error_msg = "ERROR: please make sure that a config for this node is stored in the database. \n \
+            Table-name: proxy_settings \n \
+            Full qualified domain name: "+fqdn_hostname+"\n"
 
-      query = db_cursor.fetchone()
-
-      settings = {'location_id':query[0], 'redirection_host':query[1], 'smtpserver':query[2], 'admin_email':query[3], 'db_cursor':db_cursor }
+         self._log(error_msg)
+         self._writeline(error_msg)
+         sys.exit(1)
 
       line = self._readline()
       while line:
