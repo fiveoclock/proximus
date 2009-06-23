@@ -11,11 +11,10 @@ from email.MIMEText import MIMEText
 
 uparse, ujoin = urlparse.urlparse , urlparse.urljoin
 
-global settings
+# define globaly used variables
 settings = []
-
-redirection_method = ""
-user_email = ""
+request = {'sitename':None, 'sitename_save':None, 'protocol':None, 'siteport':None, 'src_address':None, 'url':None, 'redirection_method':None }
+user = {'ident':None, 'id':None, 'name':None, 'loc_id':None, 'group_id':None, 'email':None }
 
 def log(s):
     f = open("/var/log/squid/redirector_class.log","a")
@@ -23,101 +22,125 @@ def log(s):
     f.close()
 
 # called when a site is blocked
-def deny(sitename,protocol):
-   if protocol == "ssl" :
-      ddddd = ""
-   else:
-      ddddd = ""
-      
-   #return urlparse.urlunparse((scheme,host,path,parameters,query,fragment))
-   #return "302:http://10.1.128.231"
-   #return "302:http://10.1.128.231/forbidden.html"
-   return "302:http://%s/forbidden.html" % ( proxy )
+def deny():
+   return "302:http://%s/forbidden.html" % ( settings['redirection_host'] )
+
+# called when access to a site is granted
+def grant():
+   return ""
 
 # called when a request is redirected
-def redirect(sitename,protocol,url,user_id,src_address,loc_id):
-   sitename_sav = re.sub("^www\.", "", sitename)
+def redirect():
+   global settings, request, user
 
-   if protocol == "ssl" :
-      if redirection_method == "REDIRECT_HTTP" :
-         return "302:http://%s/proximuslog/logs/confirm/site:%s/proto:%s/ip:%s/uid:%s/locid:%s/url:%s" % (settings['redirection_host'], sitename_sav, protocol, src_address, user_id, settings['location_id'], base64.b64encode("https://"+sitename))
+   if request['protocol'] == "ssl" :
+      if request['redirection_method'] == "REDIRECT_HTTP" :
+         # redirect by sending a HTTP 302 status code - not all browsers accept this
+         return "302:http://%s/proximuslog/logs/confirm/site:%s/proto:%s/ip:%s/uid:%s/locid:%s/url:%s" % (settings['redirection_host'], request['sitename_save'], request['protocol'], request['src_address'], user['id'], settings['location_id'], base64.b64encode("https://"+request['sitename']))
       
-      elif redirection_method == "REDIRECT_SSL" :
-         # the webserver there can read the requested host + requested uri and redirect to proximuslog 
-         return "srv-vie-wtrash.vie.mm-karton.com:443"
+      elif request['redirection_method'] == "REDIRECT_SSL" :
+         # the webserver there can read the requested host + requested uri and then redirect to proximuslog (SSL Certificate will not fit)
+         return "%s:443" % (settings['redirection_host'])
  
-      elif redirection_method == "REDIRECT_SSL_MAIL" :
-         smtp = smtplib.SMTP(settings['smtpserver'])
-
-         msg = MIMEText("Dear User! \n\nYour request to https://"+sitename+" has been blocked. \n\nIf you need access to this page please contact your Administrator.\n\nProXimus")
-
-         # You can use add_header or set headers directly ...
-         msg['Subject'] = 'Site '+sitename+' has been blocked'
-         # Following headers are useful to show the email correctly
-         # in your recipient's email box, and to avoid being marked
-         # as spam. They are NOT essential to the snemail call later
-         msg['From'] = "ProXimus"
-#         msg['Reply-to'] = 
-         msg['To'] = user_email
-
-         #smtp.sendmail(email_admin, user_email, msg.as_string())
-         smtp.sendmail(settings['admin_email'], user_email, msg.as_string())
-         smtp.close()
-
-         return "302:http://%s/proximuslog/logs/confirm/site:%s/proto:%s/ip:%s/uid:%s/locid:%s/url:%s" % (settings['redirection_host'], sitename_sav, protocol, src_address, user_id, settings['location_id'], base64.b64encode("https://"+sitename))
-      
-      elif redirection_method == "REDIRECT_SSL_GEN" :
-         # generate a SSL certificate on the fly and present it to the requesting browser
+      elif request['redirection_method'] == "REDIRECT_SSL_GEN" :
+         # generate a SSL certificate on the fly and present it to the requesting browser 
          # not implemented yet
-         return "srv-vie-wtrash.vie.mm-karton.com:443"
+         return "%s:443" % (settings['redirection_host'])
       
       else :
-         #default
-         return "302:http://%s/proximuslog/logs/confirm/site:%s/proto:%s/ip:%s/uid:%s/locid:%s/url:%s" % (settings['redirection_host'], sitename_sav, protocol, src_address, user_id, settings['location_id'], base64.b64encode("https://"+sitename))
+         # default redirection method - if not further specified
+         return "302:http://%s/proximuslog/logs/confirm/site:%s/proto:%s/ip:%s/uid:%s/locid:%s/url:%s" % (settings['redirection_host'], request['sitename_save'], request['protocol'], request['src_address'], user['id'], settings['location_id'], base64.b64encode("https://"+request['sitename']))
 
    else:
-      #sitename_sav = re.sub("^www.", "", sitename)
-      return "302:http://%s/proximuslog/logs/confirm/site:%s/proto:%s/ip:%s/uid:%s/locid:%s/url:%s" % (settings['redirection_host'], sitename_sav, protocol, src_address, user_id, settings['location_id'], base64.b64encode(url))
+      # its http
+      return "302:http://%s/proximuslog/logs/confirm/site:%s/proto:%s/ip:%s/uid:%s/locid:%s/url:%s" % (settings['redirection_host'], request['sitename_save'], request['protocol'], request['src_address'], user['id'], settings['location_id'], base64.b64encode(request['url']))
 
 
-def check_request(db_cursor, passed_settings, line):
+def send_mail(subject, body):
+   # code here
+   global settings, user
+   smtp = smtplib.SMTP(settings['smtpserver'])
+   msg['Subject'] = subject
+   msg['From'] = "ProXimus"
+   msg['To'] = user['email']
+   msg = MIMEText(body)
+   smtp.sendmail(settings['admin_email'], user_email, msg.as_string())
+   smtp.close()
+
+
+def deny_mail_user():
+   global user, request
+   send_mail('Site '+sitename+' has been blocked', "Dear User! \n\nYour request to https://"+sitename+" has been blocked. \n\nIf you need access to this page please contact your Administrator.\n\nProXimus")
+   deny()
+
+
+def parse_line(line):
+   global request, user
    url,src_address,ident,method,dash=string.split(line)
    # scheme://host/path;parameters?query#fragment
    (scheme,host,path,parameters,query,fragment) = uparse(url)
-   metainfo = " ".join(("",src_address,ident,method,dash))
 
-   global settings, user_email, redirection_method
-   settings = passed_settings
-   
+   user['ident'] = ident
    # remove "/-" from source ip address
-   src_address = re.sub("/.*", "", src_address)
+   request['src_address'] = re.sub("/.*", "", src_address)
 
    if method == "CONNECT" :
       """it's ssl"""
-      protocol = "ssl"
-      sitename = scheme
-      siteport = path
+      request['protocol'] = "ssl"
+      request['sitename'] = scheme
+      request['siteport'] = path
    else:
       """it' http"""
-      protocol = "http"
-      sitename = host.split(":", 1)[0]
-      try: 
-         siteport = host.split(":", 1)[1]
+      request['protocol'] = "http"
+      request['sitename'] = host.split(":", 1)[0]
+      try:
+         request['siteport'] = host.split(":", 1)[1]
       except IndexError,e:
-         siteport = "80"
+         request['siteport'] = "80"
 
+   request['sitename_save'] = re.sub("^www\.", "", request['sitename'])
+
+
+def fetch_userinfo(ident):
+   global settings, user
+
+   # get user
+   try:
+      db_cursor = settings['db_cursor']
+      db_cursor.execute ("SELECT id, username, location_id, emailaddress, group_id FROM users WHERE username = %s", ident)
+      row = db_cursor.fetchone()
+      user['id'] = row[0]
+      user['name'] = row[1]
+      user['loc_id'] = row[2]
+      user['email'] = row[3].rstrip('\n')
+      user['group_id'] = row[4]
+   except TypeError:
+      # user not found in database redirect to default site
+      user['group_id'] = None
+      return deny(sitename,protocol)
 
    # make all vars lowercase to make sure they match
    #sitename = escape(sitename)
    #ident = escape(ident.lower())
-   ident = ident.lower()
    #src_address = escape(src_address)
 
-   # allow access to to proximuslog website
-   if sitename == settings['redirection_host'] : 
-      return ""
-   
 
+def check_request(passed_settings, line):
+   global settings, request, user
+   settings = passed_settings
+   
+   #request = {'sitename':None, 'protocol':None, 'siteport':None, 'src_address':None, 'url':None, 'redirection_method':None }
+   #user = {'ident':None, 'id':None, 'name':None, 'loc_id':None, 'group_id':None, 'email':None }
+ 
+   db_cursor = settings['db_cursor']
+
+   parse_line(line)
+   fetch_userinfo(user['ident'])
+
+   # allow access to to proximuslog website
+   if request['sitename'] == settings['redirection_host'] :
+      grant()
+ 
    #
    # check if host is blocked globally
    #
@@ -128,31 +151,15 @@ def check_request(db_cursor, passed_settings, line):
                               %s RLIKE CONCAT('.*[.full-stop.]', sitename ) ) \
                            AND \
                               ( protocol = %s OR \
-                              protocol = '*' )", (sitename, sitename, protocol) )
+                              protocol = '*' )", (request['sitename'], request['sitename'], request['protocol']) )
    #print "SELECT sitename, siteport, description FROM rules WHERE globalflag = 1 AND sitename = %s OR sitename LIKE %s" % (sitename, '%'+sitename) 
    rows = db_cursor.fetchall()
    for row in rows:
-      return deny(sitename,protocol)
+      return deny()
      
-   
-   #
-   # check if host is blocked by location or group
-   #
-   # first get users loccations.id and groups.id - makes the second query a lot easier to understand
-   try:
-      db_cursor.execute ("SELECT id, group_id, location_id, emailaddress FROM users WHERE username = %s", ident)
-      row = db_cursor.fetchone()
-      user_id = row[0]
-      user_loc_id = row[2]
-      user_group_id = row[1]
-      user_email = row[3].rstrip('\n')
-   except TypeError:
-      # user not found in database redirect to default site
-      user_group_id = None
-      return deny(sitename,protocol)
-      
+
    # check if the user is in a valid group (group_id 0 means no group)
-   if (user_group_id != None) and (user_group_id != 0) :
+   if (user['group_id'] != None) and (user['group_id'] != 0) :
       db_cursor.execute ("SELECT sitename, protocol, policy, priority, description \
                            FROM rules \
                            WHERE \
@@ -165,9 +172,9 @@ def check_request(db_cursor, passed_settings, line):
                               AND \
                                  ( protocol = %s OR \
                                  protocol = '*' ) \
-                           ORDER BY priority DESC, location_id", (user_group_id, user_loc_id, sitename, sitename, protocol))
+                           ORDER BY priority DESC, location_id", (user['group_id'], user['loc_id'], request['sitename'], request['sitename'], request['protocol']))
    else :
-      #print "if none"
+      #print "group is set"
       db_cursor.execute ("SELECT sitename, protocol, policy, priority, description \
                            FROM rules \
                            WHERE \
@@ -179,7 +186,7 @@ def check_request(db_cursor, passed_settings, line):
                               AND \
                                  ( protocol = %s OR \
                                  protocol = '*' ) \
-                           ORDER BY priority DESC, location_id", (user_loc_id, sitename, sitename, protocol))
+                           ORDER BY priority DESC, location_id", (user['loc_id'], request['sitename'], request['sitename'], request['protocol']))
    rows = db_cursor.fetchall()
    for row in rows:
       if row[2] == "ALLOW" :
@@ -195,15 +202,15 @@ def check_request(db_cursor, passed_settings, line):
                               AND \
                                  ( sitename = %s OR \
                                  %s RLIKE CONCAT('.*[.full-stop.]', sitename ) ) \
-                           ", (user_id, protocol, sitename, sitename))
+                           ", (user['id'], request['protocol'], request['sitename'], request['sitename']))
          dyn = db_cursor.fetchone()
          if (dyn == None) :
-            return redirect(sitename,protocol,url,user_id,src_address,user_loc_id)
+            return redirect()
          else :
             break
-         return redirect(sitename,protocol,url,user_id,src_address,user_loc_id)
+         return redirect()
       elif row[2] == "DENY" :
-         return deny(sitename,protocol)
+         return deny()
       elif row[2] == "LEARN" :
          # check if site has already been learned
          db_cursor.execute ("SELECT sitename \

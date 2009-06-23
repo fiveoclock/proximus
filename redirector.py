@@ -53,11 +53,11 @@ class SquidRedirector:
 
       query = db_cursor.fetchone()
 
-      settings = {'location_id':query[0], 'redirection_host':query[1], 'smtpserver':query[2], 'admin_email':query[3]}
+      settings = {'location_id':query[0], 'redirection_host':query[1], 'smtpserver':query[2], 'admin_email':query[3], 'db_cursor':db_cursor }
 
       line = self._readline()
       while line:
-         response = redirector_class.check_request(db_cursor, settings, line)
+         response = redirector_class.check_request(settings, line)
          self._log("request: " + line)
          self._log("response: " + response + "\n")
          self._writeline(response)
