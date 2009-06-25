@@ -29,9 +29,73 @@ def deny():
 def grant():
    return ""
 
+
+# called when a request has to be learned
+def learn():
+   global settings, request, user
+   db_cursor = settings['db_cursor']
+   # check if site has already been learned
+   db_cursor.execute ("SELECT sitename \
+                     FROM logs \
+                     WHERE \
+                           ( user_id = %s ) \
+                        AND \
+                           ( sitename = %s OR \
+                           %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
+                     ", (user['id'], request['sitename'], request['sitename']))
+   dyn = db_cursor.fetchone()
+   if (dyn == None) :
+      db_cursor.execute ("INSERT INTO logs (sitename, ipaddress, user_id, location_id, protocol, source, created) \
+                        VALUES (%s, %s, %s, %s, %s, %s, NOW()) ", (request['sitename_save'], request['src_address'], user['id'], settings['location_id'], request['protocol'], "LEARN"))
+      dyn = db_cursor.fetchone()
+   return ""
+
+
 # called when a request is redirected
 def redirect():
    global settings, request, user
+   db_cursor = settings['db_cursor']
+
+   ######
+   ## write log into database
+   ##
+
+   # check if user has already added site to dynamic rules
+   db_cursor.execute ("SELECT sitename \
+                     FROM logs \
+                     WHERE \
+                           user_id = %s \
+                           AND protocol = %s \
+                           AND source != %s \
+                        AND \
+                           ( sitename = %s OR \
+                           %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
+                     ", (user['id'], request['protocol'], "REDIRECT", request['sitename'], request['sitename']))
+   dyn = db_cursor.fetchone()
+   if (dyn != None) :   # user is allowed to access this site
+      return ""
+   else :   # user is not yet allowed to access this site
+      # check if request has already been logged
+      db_cursor.execute ("SELECT sitename \
+                     FROM logs \
+                     WHERE \
+                           user_id = %s \
+                           AND protocol = %s \
+                           AND source = %s \
+                        AND \
+                           ( sitename = %s OR \
+                           %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
+                     ", (user['id'], request['protocol'], "REDIRECT", request['sitename'], request['sitename']))
+      dyn = db_cursor.fetchone()
+      if (dyn == None) :     # request has not been logged yet
+         db_cursor.execute ("INSERT INTO logs (sitename, user_id, protocol, location_id, source, created) \
+                            VALUES (%s, %s, %s, %s, %s, NOW()) \
+                        ", (request['sitename_save'], user['id'], request['protocol'], settings['location_id'], "REDIRECT"))
+         dyn = db_cursor.fetchone()
+
+   ######
+   ## redirect the browser to our site
+   ##
 
    if request['protocol'] == "ssl" :
       if request['redirection_method'] == "REDIRECT_HTTP" :
@@ -221,59 +285,14 @@ def check_request(passed_settings, line):
          break
       elif row[2].startswith("REDIRECT") :
          request['redirection_method'] = row[2]
-         # check if user has already added site to dynamic rules
-         db_cursor.execute ("SELECT sitename \
-                           FROM logs \
-                           WHERE \
-                                 user_id = %s \
-                                 AND protocol = %s \
-                                 AND source != %s \
-                              AND \
-                                 ( sitename = %s OR \
-                                 %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
-                           ", (user['id'], request['protocol'], "REDIRECT", request['sitename'], request['sitename']))
-         dyn = db_cursor.fetchone()
-         if (dyn != None) :
-            break
-         else :        # check if request has already been logged
-            db_cursor.execute ("SELECT sitename \
-                           FROM logs \
-                           WHERE \
-                                 user_id = %s \
-                                 AND protocol = %s \
-                                 AND source = %s \
-                              AND \
-                                 ( sitename = %s OR \
-                                 %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
-                           ", (user['id'], request['protocol'], "REDIRECT", request['sitename'], request['sitename']))
-            dyn = db_cursor.fetchone()
-            if (dyn != None) :     # request has been logged
-               return redirect()
-            else :       # log request
-               db_cursor.execute ("INSERT INTO logs (sitename, user_id, protocol, location_id, source, created) \
-                                  VALUES (%s, %s, %s, %s, %s, NOW()) \
-                              ", (request['sitename_save'], user['id'], request['protocol'], settings['location_id'], "REDIRECT"))
-               dyn = db_cursor.fetchone()
-            return redirect()
+         return redirect()
       elif row[2] == "DENY_MAIL" :
          return deny_mail_user()
       elif row[2] == "DENY" :
          return deny()
       elif row[2] == "LEARN" :
-         # check if site has already been learned
-         db_cursor.execute ("SELECT sitename \
-                           FROM logs \
-                           WHERE \
-                                 ( user_id = %s ) \
-                              AND \
-                                 ( sitename = %s OR \
-                                 %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
-                           ", (user['id'], request['sitename'], request['sitename']))
-         dyn = db_cursor.fetchone()
-         if (dyn == None) :
-            db_cursor.execute ("INSERT INTO logs (sitename, ipaddress, user_id, location_id, protocol, source, created) \
-                              VALUES (%s, %s, %s, %s, %s, %s, NOW()) ", (request['sitename_save'], request['src_address'], user['id'], settings['location_id'], request['protocol'], "LEARN"))
-            dyn = db_cursor.fetchone()
+         return learn()
 
+   # if we got to this point grant access ;-)
    return ""
 
