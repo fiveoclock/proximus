@@ -57,7 +57,6 @@ def redirect():
 
 
 def send_mail(subject, body):
-   # code here
    global settings, user
    smtp = smtplib.SMTP(settings['smtpserver'])
    msg = MIMEText(body)
@@ -72,12 +71,36 @@ def send_mail(subject, body):
 
 
 def deny_mail_user():
-   global user, request
-   if request['protocol'] == "ssl" :
-      scheme = "https"
-   else :
-      scheme = "http"
-   send_mail('Site '+request['sitename']+' has been blocked', "Dear User! \n\nYour request to "+scheme+"://"+request['sitename']+" has been blocked. \n\nIf you need access to this page please contact your Administrator.\n\nProXimus")
+   global settings, user, request
+   db_cursor = settings['db_cursor']
+
+    # check if mail has already been sent
+   db_cursor.execute ("SELECT id  \
+                        FROM maillog \
+                        WHERE \
+                           user_id = %s \
+                           AND (HOUR(NOW()) - HOUR(sent)) <= 1 \
+                           AND \
+                              ( sitename = %s OR \
+                              %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
+                           AND \
+                              ( protocol = %s OR \
+                              protocol = '*' ) \
+                           ", (user['id'], request['sitename'], request['sitename'], request['protocol']) )
+   result = db_cursor.fetchone()
+   if (result == None) : # no mail has been sent recently
+      if request['protocol'] == "ssl" :
+         scheme = "https"
+      else :
+         scheme = "http"
+
+      send_mail('Site '+request['sitename']+' has been blocked', "Dear User! \n\nYour request to "+scheme+"://"+request['sitename']+" has been blocked. \n\nIf you need access to this page please contact your Administrator.\n\nProXimus")
+      
+      # log that a mail has been sent
+      db_cursor.execute ("INSERT INTO maillog (sitename, user_id, protocol, sent) \
+                           VALUES (%s, %s, %s, NOW()) ", (request['sitename_save'], user['id'], request['protocol']))
+      dyn = db_cursor.fetchone()
+  
    return deny()
 
 
@@ -248,8 +271,8 @@ def check_request(passed_settings, line):
                            ", (user['id'], request['sitename'], request['sitename']))
          dyn = db_cursor.fetchone()
          if (dyn == None) :
-            db_cursor.execute ("INSERT INTO logs (sitename, ipaddress, user_id, location_id, protocol, source) \
-                              VALUES (%s, %s, %s, %s, %s, %s) ", (request['sitename_save'], request['src_address'], user['id'], settings['location_id'], request['protocol'], "LEARN"))
+            db_cursor.execute ("INSERT INTO logs (sitename, ipaddress, user_id, location_id, protocol, source, created) \
+                              VALUES (%s, %s, %s, %s, %s, %s, NOW()) ", (request['sitename_save'], request['src_address'], user['id'], settings['location_id'], request['protocol'], "LEARN"))
             dyn = db_cursor.fetchone()
 
    return ""
