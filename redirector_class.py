@@ -234,9 +234,9 @@ def check_request(passed_settings, line):
    if request['sitename'] == settings['redirection_host'] :
       return grant()
  
-   #
-   # check if host is blocked globally
-   #
+   ######
+   ## check if host is blocked globally
+   ##
    db_cursor.execute ("SELECT sitename, protocol  \
                         FROM globalrules \
                         WHERE \
@@ -245,13 +245,16 @@ def check_request(passed_settings, line):
                            AND \
                               ( protocol = %s OR \
                               protocol = '*' )", (request['sitename'], request['sitename'], request['protocol']) )
-   #print "SELECT sitename, siteport, description FROM rules WHERE globalflag = 1 AND sitename = %s OR sitename LIKE %s" % (sitename, '%'+sitename) 
    rows = db_cursor.fetchall()
    for row in rows:
       return deny()
-     
+
+   ######
+   ## retrieve rules
+   ##
+
    # check if the user is in a valid group (group_id 0 means no group)
-   if (user['group_id'] != None) and (user['group_id'] != 0) :
+   if (user['group_id'] != None) and (user['group_id'] != 0) :   # user is assigned to a group
       db_cursor.execute ("SELECT sitename, protocol, policy, priority, description \
                            FROM rules \
                            WHERE \
@@ -265,11 +268,12 @@ def check_request(passed_settings, line):
                                  ( protocol = %s OR \
                                  protocol = '*' ) \
                            ORDER BY priority DESC, location_id", (user['group_id'], user['loc_id'], request['sitename'], request['sitename'], request['protocol']))
-   else :
-      #print "group is set"
+   else :    # user is not assigned to a group
       db_cursor.execute ("SELECT sitename, protocol, policy, priority, description \
                            FROM rules \
                            WHERE \
+                              group_id = 0 \
+                              AND \
                                  ( location_id = %s \
                                  OR location_id = 1 ) \
                               AND \
