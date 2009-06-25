@@ -97,7 +97,7 @@ def redirect():
    ## redirect the browser to our site
    ##
 
-   if request['protocol'] == "ssl" :
+   if request['protocol'] == "SSL" :
       if request['redirection_method'] == "REDIRECT_HTTP" :
          # redirect by sending a HTTP 302 status code - not all browsers accept this
          return "302:http://%s/proximuslog/logs/confirm/site:%s/proto:%s/ip:%s/uid:%s/locid:%s/url:%s" % (settings['redirection_host'], request['sitename_save'], request['protocol'], request['src_address'], user['id'], settings['location_id'], base64.b64encode("https://"+request['sitename']))
@@ -157,7 +157,7 @@ def deny_mail_user():
                            ", (user['id'], request['sitename'], request['sitename'], request['protocol']) )
    result = db_cursor.fetchone()
    if (result == None) : # no mail has been sent recently
-      if request['protocol'] == "ssl" :
+      if request['protocol'] == "SSL" :
          scheme = "https"
       else :
          scheme = "http"
