@@ -136,9 +136,13 @@ def send_mail(subject, body):
 
 def deny_mail_user():
    global settings, user, request
-   db_cursor = settings['db_cursor']
 
-    # check if mail has already been sent
+   # if user doesn't have an email address skip the part below
+   if user['email'] == "":
+      return deny()
+
+   # check if mail has already been sent
+   db_cursor = settings['db_cursor']
    db_cursor.execute ("SELECT id  \
                         FROM maillog \
                         WHERE \
@@ -182,12 +186,12 @@ def parse_line(line):
 
    if method == "CONNECT" :
       """it's ssl"""
-      request['protocol'] = "ssl"
+      request['protocol'] = "SSL"
       request['sitename'] = scheme
       request['siteport'] = path
    else:
       """it' http"""
-      request['protocol'] = "http"
+      request['protocol'] = "HTTP"
       request['sitename'] = host.split(":", 1)[0]
       try:
          request['siteport'] = host.split(":", 1)[1]
