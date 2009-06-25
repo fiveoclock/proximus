@@ -74,6 +74,44 @@ def redirect():
    dyn = db_cursor.fetchone()
    if (dyn != None) :   # user is allowed to access this site
       return ""
+   elif settings['subsite_sharing'] == "own_parents" :    # check if someone else has already added this site as a children
+      db_cursor.execute ("SELECT log2.sitename, log2.id \
+                        FROM logs AS log1, logs AS log2 \
+                        WHERE \
+                              log1.parent_id = log2.id \
+                              AND log1.protocol = %s \
+                              AND log1.source != %s \
+                           AND \
+                              ( log1.sitename = %s OR \
+                              %s RLIKE CONCAT( '.*[[.full-stop.]]', log1.sitename, '$' )) \
+                        ", (request['protocol'], "REDIRECT", request['sitename'], request['sitename']))
+      rows1 = db_cursor.fetchall()
+      db_cursor.execute ("SELECT sitename, id \
+                        FROM logs \
+                        WHERE \
+                              user_id = %s \
+                              AND parent_id IS NULL \
+                              AND source != %s \
+                        ", (user['id'], "REDIRECT"))
+      rows2 = db_cursor.fetchall()
+
+      for row1 in rows1:
+         for row2 in rows2:
+            if row1[0] == row2[0] :
+               return ""
+   elif settings['subsite_sharing'] == "all_parents" :  # check if someone else has already added this site as a children 
+      db_cursor.execute ("SELECT sitename, id \
+                        FROM logs \
+                        WHERE \
+                              parent_id IS NOT NULL \
+                              AND source != %s \
+                           AND \
+                              ( sitename = %s OR \
+                              %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
+                        ", ("REDIRECT", request['sitename'], request['sitename']))
+      all = db_cursor.fetchone()
+      if (all != None) :
+         return ""
    else :   # user is not yet allowed to access this site
       # check if request has already been logged
       db_cursor.execute ("SELECT sitename \

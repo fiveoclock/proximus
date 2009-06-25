@@ -57,12 +57,12 @@ class SquidRedirector:
 
       # Get relevant proxy settings and catch error if no settings exist in db
       try:
-         db_cursor.execute ("SELECT location_id, redirection_host, smtpserver, admin_email, admincc \
-                           FROM proxy_settings \
+         db_cursor.execute ("SELECT location_id, redirection_host, smtpserver, admin_email, admincc, subsite_sharing, mail_interval \
+                           FROM proxy_settings, global_settings \
                            WHERE \
                                  fqdn_proxy_hostname = %s", ( fqdn_hostname ))
          query = db_cursor.fetchone()
-         settings = {'location_id':query[0], 'redirection_host':query[1], 'smtpserver':query[2], 'admin_email':query[3], 'admincc':query[4], 'db_cursor':db_cursor }
+         settings = {'location_id':query[0], 'redirection_host':query[1], 'smtpserver':query[2], 'admin_email':query[3], 'admincc':query[4], 'subsite_sharing':query[5], 'mail_interval':query[6], 'db_cursor':db_cursor }
       except TypeError:
          error_msg = "ERROR: please make sure that a config for this node is stored in the database. \n \
             Table-name: proxy_settings \n \
