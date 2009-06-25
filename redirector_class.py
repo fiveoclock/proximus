@@ -64,6 +64,9 @@ def send_mail(subject, body):
    msg['Subject'] = subject
    msg['From'] = "ProXimus"
    msg['To'] = user['email']
+   if settings['admincc'] == 1 :
+      msg['Cc'] = settings['admin_email']
+      smtp.sendmail(settings['admin_email'], settings['admin_email'], msg.as_string())
    smtp.sendmail(settings['admin_email'], user['email'], msg.as_string())
    smtp.close()
 
@@ -71,10 +74,10 @@ def send_mail(subject, body):
 def deny_mail_user():
    global user, request
    if request['protocol'] == "ssl" :
-      sheme = "https"
+      scheme = "https"
    else :
-      sheme = "http"
-   send_mail('Site '+request['sitename']+' has been blocked', "Dear User! \n\nYour request to "+sheme+"://"+request['sitename']+" has been blocked. \n\nIf you need access to this page please contact your Administrator.\n\nProXimus")
+      scheme = "http"
+   send_mail('Site '+request['sitename']+' has been blocked', "Dear User! \n\nYour request to "+scheme+"://"+request['sitename']+" has been blocked. \n\nIf you need access to this page please contact your Administrator.\n\nProXimus")
    return deny()
 
 
@@ -85,9 +88,10 @@ def parse_line(line):
    # scheme://host/path;parameters?query#fragment
    (scheme,host,path,parameters,query,fragment) = uparse(url)
 
-   user['ident'] = ident
+   user['ident'] = ident.lower()
    # remove "/-" from source ip address
    request['src_address'] = re.sub("/.*", "", src_address)
+   request['url'] = url
 
    if method == "CONNECT" :
       """it's ssl"""
@@ -134,9 +138,6 @@ def check_request(passed_settings, line):
    global settings, request, user
    settings = passed_settings
    
-   #request = {'sitename':None, 'protocol':None, 'siteport':None, 'src_address':None, 'url':None, 'redirection_method':None }
-   #user = {'ident':None, 'id':None, 'name':None, 'loc_id':None, 'group_id':None, 'email':None }
- 
    db_cursor = settings['db_cursor']
 
    parse_line(line)
@@ -153,7 +154,7 @@ def check_request(passed_settings, line):
                         FROM globalrules \
                         WHERE \
                               ( sitename = %s OR \
-                              %s RLIKE CONCAT('.*[.full-stop.]', sitename ) ) \
+                              %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
                            AND \
                               ( protocol = %s OR \
                               protocol = '*' )", (request['sitename'], request['sitename'], request['protocol']) )
@@ -162,7 +163,6 @@ def check_request(passed_settings, line):
    for row in rows:
       return deny()
      
-
    # check if the user is in a valid group (group_id 0 means no group)
    if (user['group_id'] != None) and (user['group_id'] != 0) :
       db_cursor.execute ("SELECT sitename, protocol, policy, priority, description \
@@ -173,7 +173,7 @@ def check_request(passed_settings, line):
                                  OR location_id = 1 ) \
                               AND \
                                  ( sitename = %s OR \
-                                 %s RLIKE CONCAT('.*[.full-stop.]', sitename ) ) \
+                                 %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
                               AND \
                                  ( protocol = %s OR \
                                  protocol = '*' ) \
@@ -187,7 +187,7 @@ def check_request(passed_settings, line):
                                  OR location_id = 1 ) \
                               AND \
                                  ( sitename = %s OR \
-                                 %s RLIKE CONCAT('.*[.full-stop.]', sitename ) ) \
+                                 %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
                               AND \
                                  ( protocol = %s OR \
                                  protocol = '*' ) \
@@ -204,16 +204,34 @@ def check_request(passed_settings, line):
                            WHERE \
                                  user_id = %s \
                                  AND protocol = %s \
+                                 AND source != %s \
                               AND \
                                  ( sitename = %s OR \
-                                 %s RLIKE CONCAT('.*[.full-stop.]', sitename ) ) \
-                           ", (user['id'], request['protocol'], request['sitename'], request['sitename']))
+                                 %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
+                           ", (user['id'], request['protocol'], "REDIRECT", request['sitename'], request['sitename']))
          dyn = db_cursor.fetchone()
-         if (dyn == None) :
-            return redirect()
-         else :
+         if (dyn != None) :
             break
-         return redirect()
+         else :        # check if request has already been logged
+            db_cursor.execute ("SELECT sitename \
+                           FROM logs \
+                           WHERE \
+                                 user_id = %s \
+                                 AND protocol = %s \
+                                 AND source = %s \
+                              AND \
+                                 ( sitename = %s OR \
+                                 %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
+                           ", (user['id'], request['protocol'], "REDIRECT", request['sitename'], request['sitename']))
+            dyn = db_cursor.fetchone()
+            if (dyn != None) :     # request has been logged
+               return redirect()
+            else :       # log request
+               db_cursor.execute ("INSERT INTO logs (sitename, user_id, protocol, location_id, source, created) \
+                                  VALUES (%s, %s, %s, %s, %s, NOW()) \
+                              ", (request['sitename_save'], user['id'], request['protocol'], settings['location_id'], "REDIRECT"))
+               dyn = db_cursor.fetchone()
+            return redirect()
       elif row[2] == "DENY_MAIL" :
          return deny_mail_user()
       elif row[2] == "DENY" :
@@ -226,12 +244,12 @@ def check_request(passed_settings, line):
                                  ( user_id = %s ) \
                               AND \
                                  ( sitename = %s OR \
-                                 %s RLIKE CONCAT('.*[.full-stop.]', sitename ) ) \
+                                 %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
                            ", (user['id'], request['sitename'], request['sitename']))
          dyn = db_cursor.fetchone()
          if (dyn == None) :
             db_cursor.execute ("INSERT INTO logs (sitename, ipaddress, user_id, location_id, protocol, source) \
-                              VALUES (%s, %s, %s, %s, %s, %s) ", (request['sitename_save'], request['src_address'], user['id'], user['loc_id'], request['protocol'], "LEARN"))
+                              VALUES (%s, %s, %s, %s, %s, %s) ", (request['sitename_save'], request['src_address'], user['id'], settings['location_id'], request['protocol'], "LEARN"))
             dyn = db_cursor.fetchone()
 
    return ""
