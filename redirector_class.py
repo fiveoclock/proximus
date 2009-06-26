@@ -13,7 +13,7 @@ uparse, ujoin = urlparse.urlparse , urlparse.urljoin
 
 # define globaly used variables
 settings = []
-request = {'sitename':None, 'sitename_save':None, 'protocol':None, 'siteport':None, 'src_address':None, 'url':None, 'redirection_method':None }
+request = {'sitename':None, 'sitename_save':None, 'protocol':None, 'siteport':None, 'src_address':None, 'url':None, 'redirection_method':None, 'id':None }
 user = {'ident':None, 'id':None, 'name':None, 'loc_id':None, 'group_id':None, 'email':None }
 
 def log(s):
@@ -34,7 +34,7 @@ def learn():
    global settings, request, user
    db_cursor = settings['db_cursor']
    # check if site has already been learned
-   db_cursor.execute ("SELECT sitename \
+   db_cursor.execute ("SELECT id \
                      FROM logs \
                      WHERE \
                         user_id = %s \
@@ -58,7 +58,7 @@ def redirect_log():
    db_cursor = settings['db_cursor']
 
    # check if request has already been logged
-   db_cursor.execute ("SELECT sitename \
+   db_cursor.execute ("SELECT id \
                   FROM logs \
                   WHERE \
                         user_id = %s \
@@ -68,14 +68,18 @@ def redirect_log():
                         %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
                   ", (user['id'], request['protocol'], request['sitename'], request['sitename']))
    dyn = db_cursor.fetchone()
-   if (dyn == None) :     # request has not been logged yet
+   if (dyn != None) : # request has alredy been logged
+      # set id
+      request['id'] = dyn[0]
+   else :     # request has not been logged yet
       db_cursor.execute ("INSERT INTO logs (sitename, ipaddress, user_id, protocol, location_id, source, created) \
                          VALUES (%s, %s, %s, %s, %s, %s, NOW()) \
                   ", (request['sitename_save'], request['src_address'], user['id'], request['protocol'], settings['location_id'], "REDIRECT"))
-      dyn = db_cursor.fetchone()
+      dyn = db_cursor.execute()
+      request['id'] = db_cursor.lastrowid
 
 # send redirect to the browser
-def redirect_send():
+def redirect_send_old():
    global settings, request, user
    db_cursor = settings['db_cursor']
 
@@ -101,6 +105,32 @@ def redirect_send():
       # its http
       return "302:http://%s/proximuslog/logs/confirm/site:%s/proto:%s/ip:%s/uid:%s/locid:%s/url:%s" % (settings['redirection_host'], request['sitename_save'], request['protocol'], request['src_address'], user['id'], settings['location_id'], base64.b64encode(request['url']))
 
+# send redirect to the browser
+def redirect_send():
+   global settings, request, user
+   db_cursor = settings['db_cursor']
+
+   if request['protocol'] == "SSL" :
+      if request['redirection_method'] == "REDIRECT_HTTP" :
+         # redirect by sending a HTTP 302 status code - not all browsers accept this
+         return "302:http://%s/proximuslog/logs/confirm/site:%s/id:%s/url:%s" % (settings['redirection_host'], request['sitename_save'], request['id'], base64.b64encode("https://"+request['sitename']))
+      
+      elif request['redirection_method'] == "REDIRECT_SSL" :
+         # the webserver there can read the requested host + requested uri and then redirect to proximuslog (SSL Certificate will not fit)
+         return "%s:443" % (settings['redirection_host'])
+ 
+      elif request['redirection_method'] == "REDIRECT_SSL_GEN" :
+         # generate a SSL certificate on the fly and present it to the requesting browser 
+         # not implemented yet
+         return "%s:443" % (settings['redirection_host'])
+      
+      else :
+         # default redirection method - if not further specified
+         return "302:http://%s/proximuslog/logs/confirm/site:%s/id:%s/url:%s" % (settings['redirection_host'], request['sitename_save'], request['id'], base64.b64encode("https://"+request['sitename']))
+
+   else:
+      # its http
+      return "302:http://%s/proximuslog/logs/confirm/site:%s/id:%s/url:%s" % (settings['redirection_host'], request['sitename_save'], request['id'], base64.b64encode(request['url']))
 
 
 # called when a request is redirected
@@ -108,10 +138,11 @@ def redirect():
    global settings, request, user
    db_cursor = settings['db_cursor']
 
-   if request['sitename'].startswith("-") :
-      request['sitename'] = re.sub("^-", "", request['sitename'])
-      request['sitename_save'] = re.sub("^-", "", request['sitename_save'])
-      request['url'] = re.sub("-"+request['sitename'], request['sitename'], request['url'])
+   if request['sitename'].startswith(settings['retrain_key']) :
+      key = settings['retrain_key']
+      request['sitename'] = re.sub("^"+key, "", request['sitename'])
+      request['sitename_save'] = re.sub("^"+key, "", request['sitename_save'])
+      request['url'] = re.sub(key+request['sitename'], request['sitename'], request['url'])
       redirect_log()
       return redirect_send()
 
@@ -204,14 +235,14 @@ def deny_mail_user():
                         FROM maillog \
                         WHERE \
                            user_id = %s \
-                           AND (HOUR(NOW()) - HOUR(sent)) <= 1 \
+                           AND (HOUR(NOW()) - HOUR(sent)) <= %s \
                            AND \
                               ( sitename = %s OR \
                               %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
                            AND \
                               ( protocol = %s OR \
                               protocol = '*' ) \
-                           ", (user['id'], request['sitename'], request['sitename'], request['protocol']) )
+                           ", (user['id'], settings['mail_interval'], request['sitename'], request['sitename'], request['protocol']) )
    result = db_cursor.fetchone()
    if (result == None) : # no mail has been sent recently
       if request['protocol'] == "SSL" :
