@@ -29,7 +29,6 @@ def deny():
 def grant():
    return ""
 
-
 # called when a request has to be learned
 def learn():
    global settings, request, user
@@ -38,17 +37,70 @@ def learn():
    db_cursor.execute ("SELECT sitename \
                      FROM logs \
                      WHERE \
-                           ( user_id = %s ) \
+                        user_id = %s \
+                        AND protocol = %s \
+                        AND source != %s \
                         AND \
                            ( sitename = %s OR \
                            %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
-                     ", (user['id'], request['sitename'], request['sitename']))
+                     ", (user['id'], request['protocol'], "REDIRECT", request['sitename'], request['sitename']))
    dyn = db_cursor.fetchone()
    if (dyn == None) :
       db_cursor.execute ("INSERT INTO logs (sitename, ipaddress, user_id, location_id, protocol, source, created) \
-                        VALUES (%s, %s, %s, %s, %s, %s, NOW()) ", (request['sitename_save'], request['src_address'], user['id'], settings['location_id'], request['protocol'], "LEARN"))
+                        VALUES (%s, %s, %s, %s, %s, %s, NOW()) \
+               ", (request['sitename_save'], request['src_address'], user['id'], settings['location_id'], request['protocol'], "LEARN"))
       dyn = db_cursor.fetchone()
-   return ""
+   return grant()
+
+# checks if a redirect has been logged and writes it into the db if not..
+def redirect_log():
+   global settings, request, user
+   db_cursor = settings['db_cursor']
+
+   # check if request has already been logged
+   db_cursor.execute ("SELECT sitename \
+                  FROM logs \
+                  WHERE \
+                        user_id = %s \
+                        AND protocol = %s \
+                     AND \
+                        ( sitename = %s OR \
+                        %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
+                  ", (user['id'], request['protocol'], request['sitename'], request['sitename']))
+   dyn = db_cursor.fetchone()
+   if (dyn == None) :     # request has not been logged yet
+      db_cursor.execute ("INSERT INTO logs (sitename, ipaddress, user_id, protocol, location_id, source, created) \
+                         VALUES (%s, %s, %s, %s, %s, %s, NOW()) \
+                  ", (request['sitename_save'], request['src_address'], user['id'], request['protocol'], settings['location_id']))
+      dyn = db_cursor.fetchone()
+
+# send redirect to the browser
+def redirect_send():
+   global settings, request, user
+   db_cursor = settings['db_cursor']
+
+   if request['protocol'] == "SSL" :
+      if request['redirection_method'] == "REDIRECT_HTTP" :
+         # redirect by sending a HTTP 302 status code - not all browsers accept this
+         return "302:http://%s/proximuslog/logs/confirm/site:%s/proto:%s/ip:%s/uid:%s/locid:%s/url:%s" % (settings['redirection_host'], request['sitename_save'], request['protocol'], request['src_address'], user['id'], settings['location_id'], base64.b64encode("https://"+request['sitename']))
+      
+      elif request['redirection_method'] == "REDIRECT_SSL" :
+         # the webserver there can read the requested host + requested uri and then redirect to proximuslog (SSL Certificate will not fit)
+         return "%s:443" % (settings['redirection_host'])
+ 
+      elif request['redirection_method'] == "REDIRECT_SSL_GEN" :
+         # generate a SSL certificate on the fly and present it to the requesting browser 
+         # not implemented yet
+         return "%s:443" % (settings['redirection_host'])
+      
+      else :
+         # default redirection method - if not further specified
+         return "302:http://%s/proximuslog/logs/confirm/site:%s/proto:%s/ip:%s/uid:%s/locid:%s/url:%s" % (settings['redirection_host'], request['sitename_save'], request['protocol'], request['src_address'], user['id'], settings['location_id'], base64.b64encode("https://"+request['sitename']))
+
+   else:
+      # its http
+      return "302:http://%s/proximuslog/logs/confirm/site:%s/proto:%s/ip:%s/uid:%s/locid:%s/url:%s" % (settings['redirection_host'], request['sitename_save'], request['protocol'], request['src_address'], user['id'], settings['location_id'], base64.b64encode(request['url']))
+
 
 
 # called when a request is redirected
@@ -56,8 +108,15 @@ def redirect():
    global settings, request, user
    db_cursor = settings['db_cursor']
 
+   if request['sitename'].startswith("!") :
+      request['sitename'] = re.sub("^!", "", request['sitename'])
+      request['sitename_save'] = re.sub("^!", "", request['sitename_save'])
+      request['url'] = re.sub("!"+request['sitename'], "request['sitename']", request['url'])
+      redirect_log()
+      return redirect_send()
+
    ######
-   ## write log into database
+   ## check if user the right to surf to this page, if not check against shared-subsites if enabled 
    ##
 
    # check if user has already added site to dynamic rules
@@ -73,7 +132,7 @@ def redirect():
                      ", (user['id'], request['protocol'], "REDIRECT", request['sitename'], request['sitename']))
    dyn = db_cursor.fetchone()
    if (dyn != None) :   # user is allowed to access this site
-      return ""
+      return grant()
    elif settings['subsite_sharing'] == "own_parents" :    # check if someone else has already added this site as a children
       db_cursor.execute ("SELECT log2.sitename, log2.id \
                         FROM logs AS log1, logs AS log2 \
@@ -98,7 +157,7 @@ def redirect():
       for row1 in rows1:
          for row2 in rows2:
             if row1[0] == row2[0] :
-               return ""
+               return grant()
    elif settings['subsite_sharing'] == "all_parents" :  # check if someone else has already added this site as a children 
       db_cursor.execute ("SELECT sitename, id \
                         FROM logs \
@@ -111,52 +170,12 @@ def redirect():
                         ", ("REDIRECT", request['sitename'], request['sitename']))
       all = db_cursor.fetchone()
       if (all != None) :
-         return ""
-   else :   # user is not yet allowed to access this site
-      # check if request has already been logged
-      db_cursor.execute ("SELECT sitename \
-                     FROM logs \
-                     WHERE \
-                           user_id = %s \
-                           AND protocol = %s \
-                           AND source = %s \
-                        AND \
-                           ( sitename = %s OR \
-                           %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
-                     ", (user['id'], request['protocol'], "REDIRECT", request['sitename'], request['sitename']))
-      dyn = db_cursor.fetchone()
-      if (dyn == None) :     # request has not been logged yet
-         db_cursor.execute ("INSERT INTO logs (sitename, user_id, protocol, location_id, source, created) \
-                            VALUES (%s, %s, %s, %s, %s, NOW()) \
-                        ", (request['sitename_save'], user['id'], request['protocol'], settings['location_id'], "REDIRECT"))
-         dyn = db_cursor.fetchone()
+         return grant()
 
-   ######
-   ## redirect the browser to our site
-   ##
-
-   if request['protocol'] == "SSL" :
-      if request['redirection_method'] == "REDIRECT_HTTP" :
-         # redirect by sending a HTTP 302 status code - not all browsers accept this
-         return "302:http://%s/proximuslog/logs/confirm/site:%s/proto:%s/ip:%s/uid:%s/locid:%s/url:%s" % (settings['redirection_host'], request['sitename_save'], request['protocol'], request['src_address'], user['id'], settings['location_id'], base64.b64encode("https://"+request['sitename']))
-      
-      elif request['redirection_method'] == "REDIRECT_SSL" :
-         # the webserver there can read the requested host + requested uri and then redirect to proximuslog (SSL Certificate will not fit)
-         return "%s:443" % (settings['redirection_host'])
- 
-      elif request['redirection_method'] == "REDIRECT_SSL_GEN" :
-         # generate a SSL certificate on the fly and present it to the requesting browser 
-         # not implemented yet
-         return "%s:443" % (settings['redirection_host'])
-      
-      else :
-         # default redirection method - if not further specified
-         return "302:http://%s/proximuslog/logs/confirm/site:%s/proto:%s/ip:%s/uid:%s/locid:%s/url:%s" % (settings['redirection_host'], request['sitename_save'], request['protocol'], request['src_address'], user['id'], settings['location_id'], base64.b64encode("https://"+request['sitename']))
-
-   else:
-      # its http
-      return "302:http://%s/proximuslog/logs/confirm/site:%s/proto:%s/ip:%s/uid:%s/locid:%s/url:%s" % (settings['redirection_host'], request['sitename_save'], request['protocol'], request['src_address'], user['id'], settings['location_id'], base64.b64encode(request['url']))
-
+   # if we get here user is not yet allowed to access this site
+   redirect_log()
+   return redirect_send()
+   
 
 def send_mail(subject, body):
    global settings, user
@@ -340,5 +359,5 @@ def check_request(passed_settings, line):
          return learn()
 
    # if we got to this point grant access ;-)
-   return ""
+   return grant()
 
