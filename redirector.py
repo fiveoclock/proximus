@@ -74,8 +74,8 @@ class SquidRedirector:
 
       line = self._readline()
       while line:
-         response = redirector_class.check_request(settings, line)
          self._log("request: " + line)
+         response = redirector_class.check_request(settings, line)
          self._log("response: " + response + "\n")
          self._writeline(response)
          line = self._readline()

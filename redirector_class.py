@@ -71,7 +71,7 @@ def redirect_log():
    if (dyn == None) :     # request has not been logged yet
       db_cursor.execute ("INSERT INTO logs (sitename, ipaddress, user_id, protocol, location_id, source, created) \
                          VALUES (%s, %s, %s, %s, %s, %s, NOW()) \
-                  ", (request['sitename_save'], request['src_address'], user['id'], request['protocol'], settings['location_id']))
+                  ", (request['sitename_save'], request['src_address'], user['id'], request['protocol'], settings['location_id'], "REDIRECT"))
       dyn = db_cursor.fetchone()
 
 # send redirect to the browser
@@ -108,10 +108,10 @@ def redirect():
    global settings, request, user
    db_cursor = settings['db_cursor']
 
-   if request['sitename'].startswith("!") :
-      request['sitename'] = re.sub("^!", "", request['sitename'])
-      request['sitename_save'] = re.sub("^!", "", request['sitename_save'])
-      request['url'] = re.sub("!"+request['sitename'], "request['sitename']", request['url'])
+   if request['sitename'].startswith("-") :
+      request['sitename'] = re.sub("^-", "", request['sitename'])
+      request['sitename_save'] = re.sub("^-", "", request['sitename_save'])
+      request['url'] = re.sub("-"+request['sitename'], request['sitename'], request['url'])
       redirect_log()
       return redirect_send()
 
