@@ -8,16 +8,18 @@ import MySQLdb
 import os
 import socket
 
+config = {}
+config_filename = "/etc/proximus/proximus.conf"
+
 class SquidRedirector:
    def db_connect(self):
-      self._log("started")
-      global db_cursor
+      global db_cursor, config
 
       try:
-         conn = MySQLdb.connect (host = "mysql-lga.mm-karton.com",
-            user = "proximusadmin",
-            passwd = "proximus",
-            db = "db_proximusgate")
+         conn = MySQLdb.connect (host = config['db_host'],
+            user = config['db_user'],
+            passwd = config['db_pass'],
+            db = config['db_name'])
          db_cursor = conn.cursor ()
       except MySQLdb.Error, e:
          error_msg = "ERROR: please make sure that database settings are correct; current settings: \n \
@@ -28,7 +30,23 @@ class SquidRedirector:
          self._writeline(error_msg)
          sys.exit(1)
 
-
+   def read_config(self):
+      global config
+      config_file = open(config_filename, 'r')
+      for line in config_file:
+         # Get rid of \n
+         line = line.rstrip()
+         # Empty?
+         if not line:
+            continue
+         # Comment?
+         if line.startswith("#"):
+            continue
+         (name, value) = line.split("=")
+         name = name.strip()
+         config[name] = value
+      #print config
+ 
    def __init__(self):
       self.stdin   = sys.stdin
       self.stdout  = sys.stdout
@@ -47,13 +65,12 @@ class SquidRedirector:
       self.stdout.flush()
 
    def run(self):
-      self._log("started")
-      #print os.uname()
-      #print os.system('hostname')
+      self.read_config()
       # Get the fully-qualified name.
       hostname = socket.gethostname()
       fqdn_hostname = socket.getfqdn(hostname)
       self.db_connect()
+      self._log("started")
 
       # Get relevant proxy settings and catch error if no settings exist in db
       try:
