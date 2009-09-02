@@ -75,7 +75,6 @@ def redirect_log():
       db_cursor.execute ("INSERT INTO logs (sitename, ipaddress, user_id, protocol, location_id, source, created) \
                          VALUES (%s, %s, %s, %s, %s, %s, NOW()) \
                   ", (request['sitename_save'], request['src_address'], user['id'], request['protocol'], settings['location_id'], "REDIRECT"))
-      dyn = db_cursor.execute()
       request['id'] = db_cursor.lastrowid
 
 # send redirect to the browser
@@ -141,13 +140,13 @@ def redirect():
    if request['sitename'].startswith(settings['retrain_key']) :
       key = settings['retrain_key']
       request['sitename'] = re.sub("^"+key, "", request['sitename'])
-      request['sitename_save'] = re.sub("^"+key, "", request['sitename_save'])
+      request['sitename_save'] = re.sub("^www\.", "", request['sitename'])
       request['url'] = re.sub(key+request['sitename'], request['sitename'], request['url'])
       redirect_log()
       return redirect_send()
 
    ######
-   ## check if user the right to surf to this page, if not check against shared-subsites if enabled 
+   ## check if user has the right to access this site, if not check against shared-subsites if enabled 
    ##
 
    # check if user has already added site to dynamic rules
@@ -327,7 +326,7 @@ def check_request(passed_settings, line):
       return grant()
  
    ######
-   ## check if host is blocked globally
+   ## check if site is in global whitelist (no auth needed)
    ##
    db_cursor.execute ("SELECT sitename, protocol  \
                         FROM globalrules \
@@ -339,7 +338,7 @@ def check_request(passed_settings, line):
                               protocol = '*' )", (request['sitename'], request['sitename'], request['protocol']) )
    rows = db_cursor.fetchall()
    for row in rows:
-      return deny()
+      return grant()
 
    ######
    ## retrieve rules
@@ -359,6 +358,9 @@ def check_request(passed_settings, line):
                               AND \
                                  ( protocol = %s OR \
                                  protocol = '*' ) \
+                              AND \
+                                 ( starttime is NULL AND endtime is NULL OR \
+                                 starttime <= NOW() AND NOW() <= endtime ) \
                            ORDER BY priority DESC, location_id", (user['group_id'], user['loc_id'], request['sitename'], request['sitename'], request['protocol']))
    else :    # user is not assigned to a group
       db_cursor.execute ("SELECT sitename, protocol, policy, priority, description \
@@ -374,6 +376,9 @@ def check_request(passed_settings, line):
                               AND \
                                  ( protocol = %s OR \
                                  protocol = '*' ) \
+                              AND \
+                                 ( starttime is NULL AND endtime is NULL OR \
+                                 starttime <= NOW() AND NOW() <= endtime ) \
                            ORDER BY priority DESC, location_id", (user['loc_id'], request['sitename'], request['sitename'], request['protocol']))
    rows = db_cursor.fetchall()
    for row in rows:
