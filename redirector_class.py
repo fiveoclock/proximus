@@ -58,7 +58,7 @@ def redirect_log():
    db_cursor = settings['db_cursor']
 
    # check if request has already been logged
-   db_cursor.execute ("SELECT id \
+   db_cursor.execute ("SELECT id, hitcount \
                   FROM logs \
                   WHERE \
                         user_id = %s \
@@ -71,10 +71,13 @@ def redirect_log():
    if (dyn != None) : # request has alredy been logged
       # set id
       request['id'] = dyn[0]
+      db_cursor.execute ("UPDATE logs SET hitcount=hitcount+1 \
+                           WHERE id = %s \
+                           ", ( request['id'] ) )
    else :     # request has not been logged yet
-      db_cursor.execute ("INSERT INTO logs (sitename, ipaddress, user_id, protocol, location_id, source, created) \
-                         VALUES (%s, %s, %s, %s, %s, %s, NOW()) \
-                  ", (request['sitename_save'], request['src_address'], user['id'], request['protocol'], settings['location_id'], "REDIRECT"))
+      db_cursor.execute ("INSERT INTO logs (sitename, ipaddress, user_id, protocol, location_id, source, created, hitcount) \
+                         VALUES (%s, %s, %s, %s, %s, %s, NOW(), %s) \
+                  ", (request['sitename_save'], request['src_address'], user['id'], request['protocol'], settings['location_id'], "REDIRECT", 1))
       request['id'] = db_cursor.lastrowid
 
 # send redirect to the browser
@@ -145,9 +148,13 @@ def redirect():
       redirect_log()
       return redirect_send()
 
+
    ######
    ## check if user has the right to access this site, if not check against shared-subsites if enabled 
    ##
+
+   # log request
+   redirect_log()
 
    # check if user has already added site to dynamic rules
    db_cursor.execute ("SELECT sitename \
@@ -203,7 +210,6 @@ def redirect():
          return grant()
 
    # if we get here user is not yet allowed to access this site
-   redirect_log()
    return redirect_send()
    
 
