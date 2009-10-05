@@ -66,7 +66,6 @@ class SquidRedirector:
       self.read_config()
       # Get the fully-qualified name.
       self.db_connect()
-      self._writeline("started")
 
       # Get relevant proxy settings and catch error if no settings exist in db
       try:
