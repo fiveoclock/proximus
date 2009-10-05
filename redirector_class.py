@@ -49,7 +49,10 @@ def learn():
       db_cursor.execute ("INSERT INTO logs (sitename, ipaddress, user_id, location_id, protocol, source, created) \
                         VALUES (%s, %s, %s, %s, %s, %s, NOW()) \
                ", (request['sitename_save'], request['src_address'], user['id'], settings['location_id'], request['protocol'], "LEARN"))
-      dyn = db_cursor.fetchone()
+   else :
+      db_cursor.execute ("UPDATE logs SET hitcount=hitcount+1 \
+                           WHERE id = %s \
+                           ", ( request['id'] ) )
    return grant()
 
 # checks if a redirect has been logged and writes it into the db if not..
@@ -153,7 +156,7 @@ def redirect():
    ## check if user has the right to access this site, if not check against shared-subsites if enabled 
    ##
 
-   # log request
+   # log the request
    redirect_log()
 
    # check if user has already added site to dynamic rules
