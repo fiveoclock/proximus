@@ -1,6 +1,4 @@
 #!/usr/bin/python -u
-""" redirector.py -- a script for squid redirection.
-    (a long-running process that uses unbuffered io; hence the -u flag in python)"""
 
 import sys,string
 import redirector_class
@@ -11,7 +9,7 @@ import socket
 config = {}
 config_filename = "/etc/proximus/proximus.conf"
 
-class SquidRedirector:
+class Proximus:
    def db_connect(self):
       global db_cursor, config
 
@@ -98,5 +96,5 @@ class SquidRedirector:
          line = self._readline()
 
 if __name__ == "__main__":
-   sr = SquidRedirector()
+   sr = Proximus()
    sr.run()
