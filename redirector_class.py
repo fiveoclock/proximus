@@ -1,6 +1,3 @@
-"""Reloadable module allows arbitrary url transformations.
-        must define reload_after (an integer), and rewrite(url)."""
-
 import urlparse
 import MySQLdb
 import re
@@ -300,20 +297,21 @@ def parse_line(line):
 def fetch_userinfo(ident):
    global settings, user
 
-   # get user
-   try:
-      db_cursor = settings['db_cursor']
-      db_cursor.execute ("SELECT id, username, location_id, emailaddress, group_id FROM users WHERE username = %s", ident)
-      row = db_cursor.fetchone()
-      user['id'] = row[0]
-      user['name'] = row[1]
-      user['loc_id'] = row[2]
-      user['email'] = row[3].rstrip('\n')
-      user['group_id'] = row[4]
-   except TypeError:
-      # user not found in database redirect to default site
-      user['group_id'] = None
-      return deny(sitename,protocol)
+   if ident != "-" :
+      # get user
+      try:
+         db_cursor = settings['db_cursor']
+         db_cursor.execute ("SELECT id, username, location_id, emailaddress, group_id FROM users WHERE username = %s", ident)
+         row = db_cursor.fetchone()
+         user['id'] = row[0]
+         user['name'] = row[1]
+         user['loc_id'] = row[2]
+         user['email'] = row[3].rstrip('\n')
+         user['group_id'] = row[4]
+      except TypeError:
+         user['id'] = None
+   else :
+      user['id'] = None
 
    # make all vars lowercase to make sure they match
    #sitename = escape(sitename)
@@ -324,7 +322,7 @@ def fetch_userinfo(ident):
 def check_request(passed_settings, line):
    global settings, request, user
    settings = passed_settings
-   
+
    db_cursor = settings['db_cursor']
 
    parse_line(line)
@@ -333,66 +331,59 @@ def check_request(passed_settings, line):
    # allow access to to proximuslog website
    if request['sitename'] == settings['redirection_host'] :
       return grant()
- 
+
    ######
-   ## check if site is in global whitelist (no auth needed)
+   ## Global no-auth check
    ##
-   db_cursor.execute ("SELECT sitename, protocol  \
-                        FROM globalrules \
-                        WHERE \
-                              ( sitename = %s OR \
-                              %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
-                           AND \
-                              ( protocol = %s OR \
-                              protocol = '*' )", (request['sitename'], request['sitename'], request['protocol']) )
-   rows = db_cursor.fetchall()
-   for row in rows:
+   if user['id'] == None :
+      # since squid is configured to require user auth
+      # and no user identification is sent the site must be in the no-auth table
       return grant()
+   else :
+      # actually 'else' should never happen - the browser should never
+      # send user identification if the site is in the no-auth table;
+      # in case it does we have that query
+      db_cursor.execute ("SELECT sitename, protocol  \
+                           FROM global_noauth \
+                           WHERE \
+                                 ( sitename = %s OR \
+                                 %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
+                              AND \
+                                 ( protocol = %s OR \
+                                 protocol = '*' )", (request['sitename'], request['sitename'], request['protocol']) )
+      rows = db_cursor.fetchall()
+      for row in rows:
+         return grant()
+
 
    ######
-   ## retrieve rules
+   ## retrieve rules for user
    ##
 
-   # check if the user is in a valid group (group_id 0 means no group)
-   if (user['group_id'] != None) and (user['group_id'] != 0) :   # user is assigned to a group
+   # check if we could retrieve user information
+   if user['id'] != None :
       db_cursor.execute ("SELECT sitename, protocol, policy, priority, description \
-                           FROM rules \
-                           WHERE \
-                                 ( group_id = %s \
-                                 OR location_id = %s \
-                                 OR location_id = 1 ) \
-                              AND \
-                                 ( sitename = %s OR \
-                                 %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
-                              AND \
-                                 ( protocol = %s OR \
-                                 protocol = '*' ) \
-                              AND \
-                                 ( starttime is NULL AND endtime is NULL OR \
-                                 starttime <= NOW() AND NOW() <= endtime ) \
-                           ORDER BY priority DESC, location_id", (user['group_id'], user['loc_id'], request['sitename'], request['sitename'], request['protocol']))
-   else :    # user is not assigned to a group
-      db_cursor.execute ("SELECT sitename, protocol, policy, priority, description \
-                           FROM rules \
-                           WHERE \
-                              group_id = 0 \
-                              AND \
-                                 ( location_id = %s \
-                                 OR location_id = 1 ) \
-                              AND \
-                                 ( sitename = %s OR \
-                                 %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
-                              AND \
-                                 ( protocol = %s OR \
-                                 protocol = '*' ) \
-                              AND \
-                                 ( starttime is NULL AND endtime is NULL OR \
-                                 starttime <= NOW() AND NOW() <= endtime ) \
-                           ORDER BY priority DESC, location_id", (user['loc_id'], request['sitename'], request['sitename'], request['protocol']))
+               FROM rules \
+               WHERE \
+                  group_id = %s \
+                  AND \
+                     ( location_id = %s \
+                     OR location_id = 1 ) \
+                  AND \
+                     ( sitename = %s OR \
+                     %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
+                  AND \
+                     ( protocol = %s OR \
+                     protocol = '*' ) \
+                  AND \
+                     ( starttime is NULL AND endtime is NULL OR \
+                     starttime <= NOW() AND NOW() <= endtime ) \
+               ORDER BY priority DESC, location_id",
+               (user['group_id'], user['loc_id'], request['sitename'], request['sitename'], request['protocol']))
    rows = db_cursor.fetchall()
    for row in rows:
       if row[2] == "ALLOW" :
-         break
+         return grant()
       elif row[2].startswith("REDIRECT") :
          request['redirection_method'] = row[2]
          return redirect()
@@ -403,6 +394,6 @@ def check_request(passed_settings, line):
       elif row[2] == "LEARN" :
          return learn()
 
-   # if we got to this point grant access ;-)
-   return grant()
+   # deny access if the request was not accepted until this point ;-)
+   return deny()
 
