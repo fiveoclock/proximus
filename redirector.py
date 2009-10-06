@@ -70,6 +70,7 @@ class Proximus:
       fqdn_hostname = socket.getfqdn(hostname)
       self.db_connect()
       self._log("started")
+      req_id = 0
 
       # Get relevant proxy settings and catch error if no settings exist in db
       try:
@@ -90,9 +91,11 @@ class Proximus:
 
       line = self._readline()
       while line:
-         self._log("request: " + line)
+         req_str = str(req_id)
+         req_id = req_id+1
+         self._log("Req  "+req_str+": " + line)
          response = redirector_class.check_request(settings, line)
-         self._log("response: " + response + "\n")
+         self._log("Resp "+req_str+": " + response)
          self._writeline(response)
          line = self._readline()
 
