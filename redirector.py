@@ -5,6 +5,7 @@ import redirector_class
 import MySQLdb
 import os
 import socket
+import syslog
 
 config = {}
 config_filename = "/etc/proximus/proximus.conf"
@@ -44,15 +45,15 @@ class Proximus:
          name = name.strip()
          config[name] = value
       #print config
+      config_file.close()
  
    def __init__(self):
+      syslog.openlog('proximus',syslog.LOG_PID,syslog.LOG_LOCAL5)
       self.stdin   = sys.stdin
       self.stdout  = sys.stdout
 
    def _log(self,s):
-      f = open("/var/log/squid/redirector.log","a")
-      f.write(s+'\n')
-      f.close()
+      syslog.syslog(syslog.LOG_DEBUG,s)
  
    def _readline(self):
       "Returns one unbuffered line from squid."
