@@ -57,6 +57,17 @@ def redirect_log():
    global settings, request, user
    db_cursor = settings['db_cursor']
 
+   db_cursor.execute ("INSERT INTO logs (sitename, ipaddress, user_id, protocol, location_id, source, created, hitcount) \
+                      VALUES (%s, %s, %s, %s, %s, %s, NOW(), %s) \
+                      ON DUPLICATE KEY UPDATE hitcount=hitcount+1 \
+               ", (request['sitename_save'], request['src_address'], user['id'], request['protocol'], settings['location_id'], "REDIRECT", 1))
+   request['id'] = db_cursor.lastrowid
+
+# checks if a redirect has been logged and writes it into the db if not..
+def redirect_log_old():
+   global settings, request, user
+   db_cursor = settings['db_cursor']
+
    # check if request has already been logged
    db_cursor.execute ("SELECT id, hitcount \
                   FROM logs \
