@@ -81,33 +81,6 @@ def redirect_log():
       request['id'] = db_cursor.lastrowid
 
 # send redirect to the browser
-def redirect_send_old():
-   global settings, request, user
-   db_cursor = settings['db_cursor']
-
-   if request['protocol'] == "SSL" :
-      if request['redirection_method'] == "REDIRECT_HTTP" :
-         # redirect by sending a HTTP 302 status code - not all browsers accept this
-         return "302:http://%s/proximuslog/logs/confirm/site:%s/proto:%s/ip:%s/uid:%s/locid:%s/url:%s" % (settings['redirection_host'], request['sitename_save'], request['protocol'], request['src_address'], user['id'], settings['location_id'], base64.b64encode("https://"+request['sitename']))
-      
-      elif request['redirection_method'] == "REDIRECT_SSL" :
-         # the webserver there can read the requested host + requested uri and then redirect to proximuslog (SSL Certificate will not fit)
-         return "%s:443" % (settings['redirection_host'])
- 
-      elif request['redirection_method'] == "REDIRECT_SSL_GEN" :
-         # generate a SSL certificate on the fly and present it to the requesting browser 
-         # not implemented yet
-         return "%s:443" % (settings['redirection_host'])
-      
-      else :
-         # default redirection method - if not further specified
-         return "302:http://%s/proximuslog/logs/confirm/site:%s/proto:%s/ip:%s/uid:%s/locid:%s/url:%s" % (settings['redirection_host'], request['sitename_save'], request['protocol'], request['src_address'], user['id'], settings['location_id'], base64.b64encode("https://"+request['sitename']))
-
-   else:
-      # its http
-      return "302:http://%s/proximuslog/logs/confirm/site:%s/proto:%s/ip:%s/uid:%s/locid:%s/url:%s" % (settings['redirection_host'], request['sitename_save'], request['protocol'], request['src_address'], user['id'], settings['location_id'], base64.b64encode(request['url']))
-
-# send redirect to the browser
 def redirect_send():
    global settings, request, user
    db_cursor = settings['db_cursor']
