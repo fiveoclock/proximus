@@ -1,7 +1,7 @@
 #!/usr/bin/python -u
 
 import sys,string
-import redirector_class
+import proximus_class
 import MySQLdb
 import os
 import socket
