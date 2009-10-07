@@ -48,9 +48,9 @@ def learn():
                ", (request['sitename_save'], request['src_address'], user['id'], settings['location_id'], request['protocol'], "LEARN"))
    else :
       db_cursor.execute ("UPDATE logs SET hitcount=hitcount+1 \
-                           WHERE id = %s \
-                           ", ( request['id'] ) )
+                           WHERE id = %s ", ( request['id'] ) )
    return grant()
+
 
 # checks if a redirect has been logged and writes it into the db if not..
 def redirect_log():
@@ -58,38 +58,18 @@ def redirect_log():
    db_cursor = settings['db_cursor']
 
    db_cursor.execute ("INSERT INTO logs (sitename, ipaddress, user_id, protocol, location_id, source, created, hitcount) \
-                      VALUES (%s, %s, %s, %s, %s, %s, NOW(), %s) \
+                        VALUES (%s, %s, %s, %s, %s, %s, NOW(), %s) \
                       ON DUPLICATE KEY UPDATE hitcount=hitcount+1 \
-               ", (request['sitename_save'], request['src_address'], user['id'], request['protocol'], settings['location_id'], "REDIRECT", 1))
+               ", (request['sitename_save'], request['src_address'], user['id'], request['protocol'], settings['location_id'], "REDIRECT", 1 ))
    request['id'] = db_cursor.lastrowid
 
+
 # checks if a redirect has been logged and writes it into the db if not..
-def redirect_log_old():
+def redirect_log_hit(id):
    global settings, request, user
    db_cursor = settings['db_cursor']
+   db_cursor.execute ("UPDATE logs SET hitcount=hitcount+1 WHERE id = %s", (request['id']))
 
-   # check if request has already been logged
-   db_cursor.execute ("SELECT id, hitcount \
-                  FROM logs \
-                  WHERE \
-                        user_id = %s \
-                        AND protocol = %s \
-                     AND \
-                        ( sitename = %s OR \
-                        %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
-                  ", (user['id'], request['protocol'], request['sitename'], request['sitename']))
-   dyn = db_cursor.fetchone()
-   if (dyn != None) : # request has alredy been logged
-      # set id
-      request['id'] = dyn[0]
-      db_cursor.execute ("UPDATE logs SET hitcount=hitcount+1 \
-                           WHERE id = %s \
-                           ", ( request['id'] ) )
-   else :     # request has not been logged yet
-      db_cursor.execute ("INSERT INTO logs (sitename, ipaddress, user_id, protocol, location_id, source, created, hitcount) \
-                         VALUES (%s, %s, %s, %s, %s, %s, NOW(), %s) \
-                  ", (request['sitename_save'], request['src_address'], user['id'], request['protocol'], settings['location_id'], "REDIRECT", 1))
-      request['id'] = db_cursor.lastrowid
 
 # send redirect to the browser
 def redirect_send():
@@ -137,11 +117,8 @@ def redirect():
    ## check if user has the right to access this site, if not check against shared-subsites if enabled 
    ##
 
-   # log the request
-   redirect_log()
-
    # check if user has already added site to dynamic rules
-   db_cursor.execute ("SELECT sitename \
+   db_cursor.execute ("SELECT sitename, id \
                      FROM logs \
                      WHERE \
                            user_id = %s \
@@ -153,6 +130,8 @@ def redirect():
                      ", (user['id'], request['protocol'], "REDIRECT", request['sitename'], request['sitename']))
    dyn = db_cursor.fetchone()
    if (dyn != None) :   # user is allowed to access this site
+      request['id'] = dyn[1]
+      redirect_log_hit(request['id'])
       return grant()
    elif settings['subsite_sharing'] == "own_parents" :    # check if someone else has already added this site as a children
       db_cursor.execute ("SELECT log2.sitename, log2.id \
@@ -194,6 +173,8 @@ def redirect():
          return grant()
 
    # if we get here user is not yet allowed to access this site
+   # log request
+   redirect_log()
    return redirect_send()
    
 
