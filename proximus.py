@@ -94,7 +94,7 @@ class Proximus:
          req_str = str(req_id)
          req_id = req_id+1
          self._log("Req  "+req_str+": " + line)
-         response = redirector_class.check_request(settings, line)
+         response = proximus_class.check_request(settings, line)
          self._log("Resp "+req_str+": " + response)
          self._writeline(response)
          line = self._readline()
