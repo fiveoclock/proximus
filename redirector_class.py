@@ -4,6 +4,7 @@ import re
 import sys,string
 import base64
 import smtplib
+import syslog
 from email.MIMEText import MIMEText
 
 uparse, ujoin = urlparse.urlparse , urlparse.urljoin
@@ -14,9 +15,8 @@ request = {'sitename':None, 'sitename_save':None, 'protocol':None, 'siteport':No
 user = {'ident':None, 'id':None, 'name':None, 'loc_id':None, 'group_id':None, 'email':None }
 
 def log(s):
-    f = open("/var/log/squid/redirector_class.log","a")
-    f.write(s+'\n')
-    f.close()
+   syslog.openlog('proximus',syslog.LOG_PID,syslog.LOG_LOCAL5)
+   syslog.syslog(syslog.LOG_DEBUG,s)
 
 # called when a site is blocked
 def deny():
