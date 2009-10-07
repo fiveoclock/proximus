@@ -49,7 +49,6 @@ def learn():
    else :
       db_cursor.execute ("UPDATE logs SET hitcount=hitcount+1 \
                            WHERE id = %s ", ( request['id'] ) )
-   return grant()
 
 
 # checks if a redirect has been logged and writes it into the db if not..
@@ -357,7 +356,8 @@ def check_request(passed_settings, line):
       elif row[2] == "DENY" :
          return deny()
       elif row[2] == "LEARN" :
-         return learn()
+         learn()
+         return grant()
 
    # deny access if the request was not accepted until this point ;-)
    return deny()
