@@ -4,7 +4,7 @@
 a=$(md5sum /etc/squid/noauth.txt)
 
 # get new file content
-./proximus_noauth.py
+/usr/local/bin/proximus/proximus_noauth.py
 
 if [ $? != 0 ]
 then
