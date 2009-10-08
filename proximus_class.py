@@ -282,6 +282,9 @@ def fetch_userinfo(ident):
    else :
       user['id'] = None
 
+   if settings['debug'] >= 1 :
+      log("Debug; user id: "+str(user['id']) )
+ 
    # make all vars lowercase to make sure they match
    #sitename = escape(sitename)
    #ident = escape(ident.lower())
@@ -313,7 +316,7 @@ def check_request(passed_settings, line):
       # send user identification if the site is in the no-auth table;
       # in case it does we have that query
       db_cursor.execute ("SELECT sitename, protocol  \
-                           FROM global_noauth \
+                           FROM noauth_rules \
                            WHERE \
                                  ( sitename = %s OR \
                                  %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
@@ -351,6 +354,8 @@ def check_request(passed_settings, line):
                (user['group_id'], user['loc_id'], request['sitename'], request['sitename'], request['protocol']))
    rows = db_cursor.fetchall()
    for row in rows:
+      if settings['debug'] >= 1 :
+         log("Debug; policy: "+row[2])
       if row[2] == "ALLOW" :
          return grant()
       elif row[2].startswith("REDIRECT") :
@@ -363,6 +368,9 @@ def check_request(passed_settings, line):
       elif row[2] == "LEARN" :
          learn()
          return grant()
+
+   if settings['debug'] >= 1 :
+      log("Debug; no rule found; using default deny")
 
    # deny access if the request was not accepted until this point ;-)
    return deny()
