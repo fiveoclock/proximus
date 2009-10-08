@@ -237,7 +237,11 @@ def parse_line(line):
    # scheme://host/path;parameters?query#fragment
    (scheme,host,path,parameters,query,fragment) = uparse(url)
 
+   # prepare username
    user['ident'] = ident.lower()
+   if settings['regex_cut'] != "" :
+      user['ident'] = re.sub(settings['regex_cut'], "", user['ident'])
+
    # remove "/-" from source ip address
    request['src_address'] = re.sub("/.*", "", src_address)
    request['url'] = url

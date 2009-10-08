@@ -21,9 +21,7 @@ class Proximus:
             db = config['db_name'])
          db_cursor = conn.cursor ()
       except MySQLdb.Error, e:
-         error_msg = "ERROR: please make sure that database settings are correct; current settings: \n \
-            User: "+"todo"+"\n \
-            Database: "+"todo"+"\n"
+         error_msg = "ERROR: please make sure that database settings are correctly set in "+config_filename+" \n"
 
          self._log(error_msg)
          self._writeline(error_msg)
@@ -74,16 +72,14 @@ class Proximus:
 
       # Get relevant proxy settings and catch error if no settings exist in db
       try:
-         db_cursor.execute ("SELECT location_id, redirection_host, smtpserver, admin_email, admincc, subsite_sharing, mail_interval, retrain_key \
+         db_cursor.execute ("SELECT location_id, redirection_host, smtpserver, admin_email, admincc, subsite_sharing, mail_interval, retrain_key, regex_cut \
                            FROM proxy_settings, global_settings \
                            WHERE \
                                  fqdn_proxy_hostname = %s", ( fqdn_hostname ))
          query = db_cursor.fetchone()
-         settings = {'location_id':query[0], 'redirection_host':query[1], 'smtpserver':query[2], 'admin_email':query[3], 'admincc':query[4], 'subsite_sharing':query[5], 'mail_interval':query[6], 'retrain_key':query[7], 'db_cursor':db_cursor }
+         settings = {'location_id':query[0], 'redirection_host':query[1], 'smtpserver':query[2], 'admin_email':query[3], 'admincc':query[4], 'subsite_sharing':query[5], 'mail_interval':query[6], 'retrain_key':query[7], 'regex_cut':query[8], 'db_cursor':db_cursor }
       except TypeError:
-         error_msg = "ERROR: please make sure that a config for this node is stored in the database. \n \
-            Table-name: proxy_settings \n \
-            Full qualified domain name: "+fqdn_hostname+"\n"
+         error_msg = "ERROR: please make sure that a config for this node is stored in the database. Table-name: proxy_settings - Full qualified domain name: "+fqdn_hostname+"\n"
 
          self._log(error_msg)
          self._writeline(error_msg)
