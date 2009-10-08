@@ -313,7 +313,7 @@ def check_request(passed_settings, line):
       # send user identification if the site is in the no-auth table;
       # in case it does we have that query
       db_cursor.execute ("SELECT sitename, protocol  \
-                           FROM global_noauth \
+                           FROM noauth_rules \
                            WHERE \
                                  ( sitename = %s OR \
                                  %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
