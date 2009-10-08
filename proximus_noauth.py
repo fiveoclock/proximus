@@ -69,7 +69,7 @@ class SquidRedirector:
 
       # Get relevant proxy settings and catch error if no settings exist in db
       try:
-         db_cursor.execute ("SELECT sitename FROM global_noauth")
+         db_cursor.execute ("SELECT sitename FROM noauth_rules")
          rows = db_cursor.fetchall()
          for row in rows:
             self.writefile(row[0])
