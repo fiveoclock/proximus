@@ -118,7 +118,7 @@ def redirect():
    ##
 
    # check if user has already added site to dynamic rules
-   db_cursor.execute ("SELECT sitename, id \
+   db_cursor.execute ("SELECT sitename, id, source \
                      FROM logs \
                      WHERE \
                            user_id = %s \
@@ -130,6 +130,8 @@ def redirect():
                      ", (user['id'], request['protocol'], "REDIRECT", request['sitename'], request['sitename']))
    dyn = db_cursor.fetchone()
    if (dyn != None) :   # user is allowed to access this site
+      if settings['debug'] >= 1 :
+         log("Debug REDIRECT; Log found; Log-id="+str(dyn[1])+" Site="+dyn[0]+" Source="+dyn[2])
       request['id'] = dyn[1]
       redirect_log_hit(request['id'])
       return grant()
@@ -157,6 +159,8 @@ def redirect():
       for row1 in rows1:
          for row2 in rows2:
             if row1[0] == row2[0] :
+               if settings['debug'] >= 1 :
+                  log("Debug REDIRECT; Log found with subsite sharing - own_parents; Log-id="+str(rows1[1]))
                return grant()
    elif settings['subsite_sharing'] == "all_parents" :  # check if someone else has already added this site as a children 
       db_cursor.execute ("SELECT sitename, id \
@@ -170,9 +174,13 @@ def redirect():
                         ", ("REDIRECT", request['sitename'], request['sitename']))
       all = db_cursor.fetchone()
       if (all != None) :
+         if settings['debug'] >= 1 :
+            log("Debug REDIRECT; Log found with subsite sharing - all_parents; Log-id="+str(all[1]))
          return grant()
 
    # if we get here user is not yet allowed to access this site
+   if settings['debug'] >= 1 :
+      log("Debug REDIRECT; No log found; DENY")
    # log request
    redirect_log()
    return redirect_send()
@@ -283,7 +291,7 @@ def fetch_userinfo(ident):
       user['id'] = None
 
    if settings['debug'] >= 1 :
-      log("Debug; user id: "+str(user['id']) )
+      log("Debug; User found; id="+str(user['id'])+" locationid="+str(user['id'])+" groupid="+str(user['id']) )
  
    # make all vars lowercase to make sure they match
    #sitename = escape(sitename)
@@ -310,6 +318,8 @@ def check_request(passed_settings, line):
    if user['id'] == None :
       # since squid is configured to require user auth
       # and no user identification is sent the site must be in the no-auth table
+      if settings['debug'] >= 1 :
+         log("Debug; ALLOW - Request with no user-id - looks like a NoAuth rule")
       return grant()
    else :
       # actually 'else' should never happen - the browser should never
@@ -334,7 +344,7 @@ def check_request(passed_settings, line):
 
    # check if we could retrieve user information
    if user['id'] != None :
-      db_cursor.execute ("SELECT sitename, protocol, policy, priority, description \
+      db_cursor.execute ("SELECT id, sitename, policy, location_id, group_id, priority, description \
                FROM rules \
                WHERE \
                   group_id = %s \
@@ -355,7 +365,7 @@ def check_request(passed_settings, line):
    rows = db_cursor.fetchall()
    for row in rows:
       if settings['debug'] >= 1 :
-         log("Debug; policy: "+row[2])
+         log("Debug; Rule found; id="+str(row[0])+" Site="+row[1]+" Action="+row[2]+" Location="+str(row[3])+" Group="+str(row[4])+" Prio="+str(row[5])+" Desc="+row[6])
       if row[2] == "ALLOW" :
          return grant()
       elif row[2].startswith("REDIRECT") :
