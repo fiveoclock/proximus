@@ -319,23 +319,24 @@ def check_request(passed_settings, line):
       # since squid is configured to require user auth
       # and no user identification is sent the site must be in the no-auth table
       if settings['debug'] >= 1 :
-         log("Debug; ALLOW - Request with no user-id - looks like a NoAuth rule")
+         log("Debug; ALLOW - Request with no user-id - looks like a NoAuth rule ;-)")
       return grant()
    else :
-      # actually 'else' should never happen - the browser should never
+      # actually this should not be nessecary - the browser should never
       # send user identification if the site is in the no-auth table;
       # in case it does we have that query
-      db_cursor.execute ("SELECT sitename, protocol  \
-                           FROM noauth_rules \
-                           WHERE \
-                                 ( sitename = %s OR \
-                                 %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
-                              AND \
-                                 ( protocol = %s OR \
-                                 protocol = '*' )", (request['sitename'], request['sitename'], request['protocol']) )
-      rows = db_cursor.fetchall()
-      for row in rows:
-         return grant()
+      # so commenting this out now
+      #db_cursor.execute ("SELECT sitename, protocol  \
+      #                     FROM noauth_rules \
+      #                     WHERE \
+      #                           ( sitename = %s OR \
+      #                           %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
+      #                        AND \
+      #                           ( protocol = %s OR \
+      #                           protocol = '*' )", (request['sitename'], request['sitename'], request['protocol']) )
+      #rows = db_cursor.fetchall()
+      #for row in rows:
+      #   return grant()
 
 
    ######
