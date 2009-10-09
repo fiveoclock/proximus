@@ -72,7 +72,7 @@ class SquidRedirector:
          db_cursor.execute ("SELECT sitename FROM noauth_rules")
          rows = db_cursor.fetchall()
          for row in rows:
-            self.writefile(row[0])
+            self.writefile("."+row[0])
       except TypeError:
          error_msg = "ERROR: please make sure that a config for this node is stored in the database. \n \
             Table-name: proxy_settings \n \
