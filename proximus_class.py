@@ -321,13 +321,11 @@ def check_request(passed_settings, line):
       if settings['debug'] >= 1 :
          log("Debug; ALLOW - Request with no user-id - looks like a NoAuth rule ;-)")
       return grant()
-   else :
+   #else :
       # actually this should not be nessecary - the browser should never
       # send user identification if the site is in the no-auth table;
       # in case it does we have that query
       # so commenting this out now
-      if settings['debug'] >= 1 :
-         log("Debug; NoAuth check - should not happen normally ;-)")
       #db_cursor.execute ("SELECT sitename, protocol  \
       #                     FROM noauth_rules \
       #                     WHERE \

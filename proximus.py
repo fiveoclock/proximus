@@ -44,6 +44,12 @@ class Proximus:
          config[name] = value
       #print config
       config_file.close()
+
+      # do some converting
+      if config.has_key("debug") :
+         config['debug'] = int(config['debug'])
+      else :
+         config['debug'] = 0
  
    def __init__(self):
       syslog.openlog('proximus',syslog.LOG_PID,syslog.LOG_LOCAL5)
