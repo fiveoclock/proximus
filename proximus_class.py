@@ -348,7 +348,8 @@ def check_request(passed_settings, line):
       db_cursor.execute ("SELECT id, sitename, policy, location_id, group_id, priority, description \
                FROM rules \
                WHERE \
-                  group_id = %s \
+                     ( group_id = %s \
+                     OR group_id = 0 ) \
                   AND \
                      ( location_id = %s \
                      OR location_id = 1 ) \
