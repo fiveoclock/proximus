@@ -291,7 +291,10 @@ def fetch_userinfo(ident):
       user['id'] = None
 
    if settings['debug'] >= 1 :
-      log("Debug; User found; id="+str(user['id'])+" locationid="+str(user['id'])+" groupid="+str(user['id']) )
+      if user['id'] != None :
+         log("Debug; User found; id="+str(user['id'])+" locationid="+str(user['loc_id'])+" groupid="+str(user['group_id']) )
+      else :
+         log("Debug; No User found; ident="+ident)
  
    # make all vars lowercase to make sure they match
    #sitename = escape(sitename)
