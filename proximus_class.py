@@ -241,7 +241,18 @@ def deny_mail_user():
 def parse_line(line):
    global request, user
    uparse, ujoin = urlparse.urlparse , urlparse.urljoin
-   url,src_address,ident,method,dash=string.split(line)
+
+   withdraw = string.split(line)
+   if len(withdraw) >= 5:
+      # all needed parameters are given
+      url = withdraw[0]
+      src_address = withdraw[1]
+      ident = withdraw[2]
+      method = withdraw[3]
+   else:
+      # too less parameters - deny
+      return False
+
    # scheme://host/path;parameters?query#fragment
    (scheme,host,path,parameters,query,fragment) = uparse(url)
 
@@ -308,7 +319,8 @@ def check_request(passed_settings, line):
 
    db_cursor = settings['db_cursor']
 
-   parse_line(line)
+   if parse_line(line) == False:
+      return deny()
    fetch_userinfo(user['ident'])
 
    # allow access to to proximuslog website
