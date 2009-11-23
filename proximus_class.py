@@ -278,7 +278,7 @@ def fetch_userinfo(ident):
       # get user
       try:
          db_cursor = settings['db_cursor']
-         db_cursor.execute ("SELECT id, username, location_id, emailaddress, group_id FROM users WHERE username = %s", ident)
+         db_cursor.execute ("SELECT id, username, location_id, emailaddress, group_id FROM users WHERE username = %s AND active = 'Y'", ident)
          row = db_cursor.fetchone()
          user['id'] = row[0]
          user['name'] = row[1]
