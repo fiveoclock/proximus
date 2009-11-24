@@ -1,10 +1,11 @@
 #!/bin/sh
 
 # make a checksum of the file
-a=$(md5sum /etc/squid/noauth.txt)
+f_ip1=$(md5sum /etc/squid/noauth_ip.txt)
+f_dn1=$(md5sum /etc/squid/noauth_dn.txt)
 
 # get new file content
-/usr/local/bin/proximus/proximus_noauth.py
+/usr/local/bin/proximus/proximus_noauth.php
 
 if [ $? != 0 ]
 then
@@ -14,10 +15,11 @@ then
 fi
 
 # get new checksum
-b=$(md5sum /etc/squid/noauth.txt)
+f_ip2=$(md5sum /etc/squid/noauth_ip.txt)
+f_dn2=$(md5sum /etc/squid/noauth_dn.txt)
 
 # compare
-if [ "$a" != "$b" ]
+if [ "$f_ip1 $f_dn1" != "$f_ip2 $f_dn2" ]
 then
    # content has changed - so reload
    /etc/init.d/squid reload
