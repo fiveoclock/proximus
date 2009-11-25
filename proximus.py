@@ -9,6 +9,7 @@ import syslog
 
 config = {}
 config_filename = "/etc/proximus/proximus.conf"
+passthrough_filename = "/etc/proximus/passthrough"
 
 class Proximus:
    def db_connect(self):
@@ -44,6 +45,12 @@ class Proximus:
          config[name] = value
       #print config
       config_file.close()
+
+      if os.path.isfile(passthrough_filename) :
+         self._log("Warning, file: "+passthrough_filename+" exists; Passthrough mode activated")
+         config['passthrough'] = True
+      else :
+         config['passthrough'] = False
 
       # do some converting
       if config.has_key("debug") :
@@ -93,12 +100,15 @@ class Proximus:
 
       line = self._readline()
       while line:
-         req_str = str(req_id)
-         req_id = req_id+1
-         self._log("Req  "+req_str+": " + line)
-         response = proximus_class.check_request(settings, line)
-         self._log("Resp "+req_str+": " + response)
-         self._writeline(response)
+         if config['passthrough'] == True :
+            self._writeline("")
+         else:
+            req_str = str(req_id)
+            req_id = req_id+1
+            self._log("Req  "+req_str+": " + line)
+            response = proximus_class.check_request(settings, line)
+            self._log("Resp "+req_str+": " + response)
+            self._writeline(response)
          line = self._readline()
 
 if __name__ == "__main__":
