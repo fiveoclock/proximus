@@ -22,15 +22,23 @@ class Proximus:
             db = config['db_name'])
          db_cursor = conn.cursor ()
       except MySQLdb.Error, e:
-         error_msg = "ERROR: please make sure that database settings are correctly set in "+config_filename+" \n"
+         error_msg = "ERROR: please make sure that database settings are correctly set in "+config_filename
+         self._log("ERROR: activating passthrough-mode until config is present")
+         config['passthrough'] = True
 
+         self._log(error_msg)
+         self._writeline(error_msg)
+
+   def read_config(self):
+      global config
+      try:
+         config_file = open(config_filename, 'r')
+      except :
+         error_msg = "ERROR: config file not found: "+config_filename
          self._log(error_msg)
          self._writeline(error_msg)
          sys.exit(1)
 
-   def read_config(self):
-      global config
-      config_file = open(config_filename, 'r')
       for line in config_file:
          # Get rid of \n
          line = line.rstrip()
@@ -91,12 +99,12 @@ class Proximus:
                                  fqdn_proxy_hostname = %s", ( fqdn_hostname ))
          query = db_cursor.fetchone()
          settings = {'location_id':query[0], 'redirection_host':query[1], 'smtpserver':query[2], 'admin_email':query[3], 'admincc':query[4], 'subsite_sharing':query[5], 'mail_interval':query[6], 'retrain_key':query[7], 'regex_cut':query[8], 'db_cursor':db_cursor, 'debug':config['debug'] }
-      except TypeError:
-         error_msg = "ERROR: please make sure that a config for this node is stored in the database. Table-name: proxy_settings - Full qualified domain name: "+fqdn_hostname+"\n"
-
+      except :
+         error_msg = "ERROR: please make sure that a config for this node is stored in the database. Table-name: proxy_settings - Full qualified domain name: "+fqdn_hostname
+         self._log("ERROR: activating passthrough-mode until config is present")
          self._log(error_msg)
          self._writeline(error_msg)
-         sys.exit(1)
+         config['passthrough'] = True
 
       line = self._readline()
       while line:
