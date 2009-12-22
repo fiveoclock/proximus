@@ -1,0 +1,85 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+# Sample debian/rules that uses debhelper.
+#
+# This file was originally written by Joey Hess and Craig Small.
+# As a special exception, when this file is copied by dh-make into a
+# dh-make output file, you may use that output file without restriction.
+# This special exception was added by Craig Small in version 0.37 of dh-make.
+#
+# Modified to make a template file for a multi-binary package with separated
+# build-arch and build-indep targets  by Bill Allombert 2001
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+# This has to be exported to make some magic below work.
+export DH_OPTIONS
+
+DESTDIR=`pwd`/debian/proximus
+
+configure: configure-stamp
+configure-stamp:
+	dh_testdir
+
+build: build-stamp
+
+build-stamp: configure-stamp
+	dh_testdir
+
+clean:
+	dh_testdir
+	dh_testroot
+	dh_clean 
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_clean
+	dh_installdirs -i
+	# directories
+	install -d ${DESTDIR}/etc/proximus
+	install -d ${DESTDIR}/usr/local
+	install -d ${DESTDIR}/usr/local/bin
+	install -d ${DESTDIR}/usr/local/bin/proximus
+	install -d ${DESTDIR}/srv/www/proximus
+	install -d ${DESTDIR}/srv/www/proximus/img
+	install -d ${DESTDIR}/srv/www/proximus/templates
+	install -d -o 33 -g 33 ${DESTDIR}/srv/www/proximus/templates/compile
+	 
+	install -m640 -o 0 -g 13 etc/proximus/proximus.conf ${DESTDIR}/etc/proximus/proximus.conf
+	install -m644 usr/local/bin/proximus/* ${DESTDIR}/usr/local/bin/proximus
+	install -m644 srv/www/proximus/forbidden.html ${DESTDIR}/srv/www/proximus
+	install -m644 srv/www/proximus/confirm.php    ${DESTDIR}/srv/www/proximus
+	install -m644 srv/www/proximus/logo.png       ${DESTDIR}/srv/www/proximus
+	install -m644 srv/www/proximus/proximus.php   ${DESTDIR}/srv/www/proximus
+	install -m644 srv/www/proximus/test.php       ${DESTDIR}/srv/www/proximus
+	install -m644 srv/www/proximus/user.php       ${DESTDIR}/srv/www/proximus
+	install -m644 srv/www/proximus/img/logo.png   ${DESTDIR}/srv/www/proximus/img
+	install -m644 srv/www/proximus/templates/confirm.tpl ${DESTDIR}/srv/www/proximus/templates
+	
+	
+	
+
+# Build architecture-independent files here.
+binary-indep: build install
+	dh_testdir
+	dh_testroot
+	dh_installchangelogs
+	dh_installdocs
+	dh_installexamples
+	dh_installinit
+	dh_installcron
+	dh_link
+	dh_compress
+	dh_fixperms
+	dh_installdeb
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+# Build architecture-dependent files here.
+binary-arch: build install
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary install configure

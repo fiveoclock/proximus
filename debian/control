@@ -1,0 +1,22 @@
+Source: proximus
+Section: net
+Priority: extra
+Maintainer: Alexander Ganster <alexander.ganster@mm-karton.com>
+Uploaders: Alexander Ganster <alexander.ganster@mm-karton.com>
+Build-Depends: debhelper (>= 5)
+Standards-Version: 3.7.3
+Homepage: http://www.proximus.org
+Vcs-Svn: git://git.proximus.org/proximus.git
+Dm-Upload-Allowed: yes
+
+Package: proximus
+Architecture: all
+Depends: squid, smarty, apache2, libapache2-mod-php5, php5-mysql, python-mysqldb
+Description: Flexible management interface for squid proxy
+ Proximus is a flexible management interface for squid proxy
+ .
+ Key features are:
+ .
+  * Management of rules per location/group/user
+  * Administrators can be defined per location
+  * Definition of global rules
