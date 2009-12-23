@@ -45,6 +45,7 @@ install: build
 	install -d ${DESTDIR}/srv/www/proximus/templates
 	install -d -o 33 -g 33 ${DESTDIR}/srv/www/proximus/templates/compile
 	 
+	install -m644 etc/cron.d/proximus ${DESTDIR}/etc/cron.d
 	install -m640 -o 13 -g 33 etc/proximus/proximus.conf ${DESTDIR}/etc/proximus/proximus.conf
 	install -m644 usr/share/proximus/* ${DESTDIR}/usr/share/proximus
 	chmod +x ${DESTDIR}/usr/share/proximus/proximus.py
