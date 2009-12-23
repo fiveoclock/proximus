@@ -54,7 +54,6 @@ install: build
 	install -m644 srv/www/proximus/forbidden.html ${DESTDIR}/srv/www/proximus
 	install -m644 srv/www/proximus/confirm.php    ${DESTDIR}/srv/www/proximus
 	install -m644 srv/www/proximus/proximus.php   ${DESTDIR}/srv/www/proximus
-	install -m644 srv/www/proximus/test.php       ${DESTDIR}/srv/www/proximus
 	install -m644 srv/www/proximus/user.php       ${DESTDIR}/srv/www/proximus
 	install -m644 srv/www/proximus/img/logo.png   ${DESTDIR}/srv/www/proximus/img
 	install -m644 srv/www/proximus/templates/confirm.tpl ${DESTDIR}/srv/www/proximus/templates
