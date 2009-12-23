@@ -39,18 +39,16 @@ install: build
 	dh_installdirs -i
 	# directories
 	install -d ${DESTDIR}/etc/proximus
-	install -d ${DESTDIR}/usr/local
-	install -d ${DESTDIR}/usr/local/bin
-	install -d ${DESTDIR}/usr/local/bin/proximus
+	install -d ${DESTDIR}/usr/share/proximus
 	install -d ${DESTDIR}/srv/www/proximus
 	install -d ${DESTDIR}/srv/www/proximus/img
 	install -d ${DESTDIR}/srv/www/proximus/templates
 	install -d -o 33 -g 33 ${DESTDIR}/srv/www/proximus/templates/compile
 	 
 	install -m640 -o 13 -g 33 etc/proximus/proximus.conf ${DESTDIR}/etc/proximus/proximus.conf
-	install -m644 usr/local/bin/proximus/* ${DESTDIR}/usr/local/bin/proximus
-	chmod +x ${DESTDIR}/usr/local/bin/proximus/proximus.py
-	chmod +x ${DESTDIR}/usr/local/bin/proximus/proximus_noauth_reload.sh
+	install -m644 usr/share/proximus/* ${DESTDIR}/usr/share/proximus
+	chmod +x ${DESTDIR}/usr/share/proximus/proximus.py
+	chmod +x ${DESTDIR}/usr/share/proximus/proximus_noauth_reload.sh
 	install -m644 srv/www/proximus/forbidden.html ${DESTDIR}/srv/www/proximus
 	install -m644 srv/www/proximus/confirm.php    ${DESTDIR}/srv/www/proximus
 	install -m644 srv/www/proximus/proximus.php   ${DESTDIR}/srv/www/proximus
