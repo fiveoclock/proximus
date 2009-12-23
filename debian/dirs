@@ -1,3 +1,4 @@
 etc/proximus
+etc/cron.d
 usr/local/bin/proximus
 srv/www/proximus
