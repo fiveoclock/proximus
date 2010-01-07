@@ -1,0 +1,3 @@
+# reload noauth squid config
+
+* * * * * root test -x /usr/share/proximus/proximus_noauth_reload.sh && /usr/share/proximus/proximus_noauth_reload.sh

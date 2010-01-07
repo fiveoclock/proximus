@@ -5,7 +5,7 @@ f_ip1=$(md5sum /etc/squid/noauth_ip.txt)
 f_dn1=$(md5sum /etc/squid/noauth_dn.txt)
 
 # get new file content
-/usr/local/bin/proximus/proximus_noauth.php
+/usr/share/proximus/proximus_noauth.php
 
 if [ $? != 0 ]
 then
