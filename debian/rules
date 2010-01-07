@@ -50,6 +50,7 @@ install: build
 	install -m644 usr/share/proximus/* ${DESTDIR}/usr/share/proximus
 	chmod +x ${DESTDIR}/usr/share/proximus/proximus.py
 	chmod +x ${DESTDIR}/usr/share/proximus/proximus_noauth_reload.sh
+	chmod +x ${DESTDIR}/usr/share/proximus/proximus_noauth.php
 	install -m644 srv/www/proximus/forbidden.html ${DESTDIR}/srv/www/proximus
 	install -m644 srv/www/proximus/confirm.php    ${DESTDIR}/srv/www/proximus
 	install -m644 srv/www/proximus/proximus.php   ${DESTDIR}/srv/www/proximus
