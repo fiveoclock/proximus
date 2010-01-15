@@ -1,3 +1,9 @@
+proximus (0.1-1) unstable; urgency=low
+
+  * make sure some permissions are set correctly on install
+
+ -- Alexander Ganster <alexander.ganster@mm-karton.com>  Fri, 15 Jan 2010 13:03:41 +0100
+
 proximus (0.1) unstable; urgency=low
 
   * Initial release 
