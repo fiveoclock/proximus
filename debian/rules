@@ -37,13 +37,14 @@ install: build
 	dh_testroot
 	dh_clean
 	dh_installdirs -i
+	dh_install
 	# directories
 	install -d ${DESTDIR}/etc/proximus
 	install -d ${DESTDIR}/usr/share/proximus
 	install -d ${DESTDIR}/srv/www/proximus
 	install -d ${DESTDIR}/srv/www/proximus/img
 	install -d ${DESTDIR}/srv/www/proximus/templates
-	install -d -o 33 -g 33 ${DESTDIR}/srv/www/proximus/templates/compile
+	install -d ${DESTDIR}/srv/www/proximus/templates/compile
 	 
 	install -m644 etc/cron.d/proximus ${DESTDIR}/etc/cron.d/proximus
 	install -m640 -o 13 -g 33 etc/proximus/proximus.conf ${DESTDIR}/etc/proximus/proximus.conf
@@ -74,6 +75,11 @@ binary-indep: build install
 	dh_compress
 	dh_fixperms
 	dh_installdeb
+	# fix some permissions
+	chown 13:33 ${DESTDIR}/etc/proximus/proximus.conf
+	chmod 440 ${DESTDIR}/etc/proximus/proximus.conf
+	chown 33:33 ${DESTDIR}/srv/www/proximus/templates/compile
+	
 	dh_gencontrol
 	dh_md5sums
 	dh_builddeb

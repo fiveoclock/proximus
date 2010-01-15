@@ -1,4 +1,5 @@
 dh_installdirs
+dh_install
 dh_installchangelogs
 dh_installdocs
 dh_installexamples
