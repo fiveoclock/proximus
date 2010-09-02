@@ -1,3 +1,10 @@
+proximus (0.1.1) unstable; urgency=low
+
+  * change web-root in apache conf
+  * allow to change web-root in proximus conf
+
+ -- Alexander Ganster <alexander.ganster@mm-karton.com>  Thu, 02 Sep 2010 13:33:51 +0200
+
 proximus (0.1-1) unstable; urgency=low
 
   * make sure some permissions are set correctly on install
