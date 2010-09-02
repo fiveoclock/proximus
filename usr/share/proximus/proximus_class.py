@@ -20,7 +20,7 @@ def log(s):
 
 # called when a site is blocked
 def deny():
-   return "302:http://%s/forbidden.html" % ( settings['redirection_host'] )
+   return "302:http://%s%s/forbidden.html" % ( settings['redirection_host'], settings['web_path'] )
 
 # called when access to a site is granted
 def grant():
@@ -77,26 +77,12 @@ def redirect_send():
    db_cursor = settings['db_cursor']
 
    if request['protocol'] == "SSL" :
-      if request['redirection_method'] == "REDIRECT_HTTP" :
-         # redirect by sending a HTTP 302 status code - not all browsers accept this
-         return "302:http://%s/proximus.php?site=%s&id=%s&url=%s" % (settings['redirection_host'], request['sitename_save'], request['id'], base64.b64encode("https://"+request['sitename']))
-      
-      elif request['redirection_method'] == "REDIRECT_SSL" :
-         # the webserver there can read the requested host + requested uri and then redirect to proximuslog (SSL Certificate will not fit)
-         return "%s:443" % (settings['redirection_host'])
- 
-      elif request['redirection_method'] == "REDIRECT_SSL_GEN" :
-         # generate a SSL certificate on the fly and present it to the requesting browser 
-         # not implemented yet
-         return "%s:443" % (settings['redirection_host'])
-      
-      else :
-         # default redirection method - if not further specified
-         return "302:http://%s/proximus.php?site=%s&id=%s&url=%s" % (settings['redirection_host'], request['sitename_save'], request['id'], base64.b64encode("https://"+request['sitename']))
+      # default redirection method - if not further specified
+      return "302:http://%s%s/proximus.php?site=%s&id=%s&url=%s" % (settings['redirection_host'], settings['web_path'], request['sitename_save'], request['id'], base64.b64encode("https://"+request['sitename']))
 
    else:
       # its http
-      return "302:http://%s/proximus.php?site=%s&id=%s&url=%s" % (settings['redirection_host'], request['sitename_save'], request['id'], base64.b64encode(request['url']))
+      return "302:http://%s%s/proximus.php?site=%s&id=%s&url=%s" % (settings['redirection_host'], settings['web_path'], request['sitename_save'], request['id'], base64.b64encode(request['url']))
 
 
 # called when a request is redirected
