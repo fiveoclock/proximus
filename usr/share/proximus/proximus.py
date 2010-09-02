@@ -62,7 +62,7 @@ class Proximus:
 
       # set defaults
       if not config.has_key("web_path") :
-         config['web_path'] = "/proximus/"
+         config['web_path'] = "/proximus"
 
       # do some converting
       if config.has_key("debug") :
