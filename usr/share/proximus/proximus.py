@@ -60,6 +60,10 @@ class Proximus:
       else :
          config['passthrough'] = False
 
+      # set defaults
+      if not config.has_key("web_path") :
+         config['web_path'] = "/proximus/"
+
       # do some converting
       if config.has_key("debug") :
          config['debug'] = int(config['debug'])
@@ -98,7 +102,7 @@ class Proximus:
                            WHERE \
                                  fqdn_proxy_hostname = %s", ( fqdn_hostname ))
          query = db_cursor.fetchone()
-         settings = {'location_id':query[0], 'redirection_host':query[1], 'smtpserver':query[2], 'admin_email':query[3], 'admincc':query[4], 'subsite_sharing':query[5], 'mail_interval':query[6], 'retrain_key':query[7], 'regex_cut':query[8], 'db_cursor':db_cursor, 'debug':config['debug'] }
+         settings = {'location_id':query[0], 'redirection_host':query[1], 'smtpserver':query[2], 'admin_email':query[3], 'admincc':query[4], 'subsite_sharing':query[5], 'mail_interval':query[6], 'retrain_key':query[7], 'regex_cut':query[8], 'db_cursor':db_cursor, 'debug':config['debug'], 'web_path':config['web_path'] }
       except :
          error_msg = "ERROR: please make sure that a config for this node is stored in the database. Table-name: proxy_settings - Full qualified domain name: "+fqdn_hostname
          self._log("ERROR: activating passthrough-mode until config is present")
