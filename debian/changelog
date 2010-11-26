@@ -1,3 +1,12 @@
+proximus (0.1.2) unstable; urgency=low
+
+  * rework reload script
+      - don't reload squid if it isn't running
+      - don't create empty files if database is unavailable
+      - be more quiet when reloading squid
+
+ -- Alexander Ganster <alexander.ganster@mm-karton.com>  Fri, 26 Nov 2010 13:05:03 +0100
+
 proximus (0.1.1) unstable; urgency=low
 
   * change web-root in apache conf
