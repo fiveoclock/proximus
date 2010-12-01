@@ -1,4 +1,4 @@
-proximus (0.1.2) unstable; urgency=low
+proximus (0.1.2) lenny; urgency=low
 
   * rework reload script
       - don't reload squid if it isn't running
