@@ -1,3 +1,9 @@
+proximus (0.1.2-1) lenny; urgency=low
+
+  * packaging: fix target distribution
+
+ -- Alexander Ganster <alexander.ganster@mm-karton.com>  Wed, 01 Dec 2010 08:55:02 +0100
+
 proximus (0.1.2) unstable; urgency=low
 
   * rework reload script
