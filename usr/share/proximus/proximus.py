@@ -117,10 +117,12 @@ class Proximus:
          else:
             req_str = str(req_id)
             req_id = req_id+1
-            self._log("Req  "+req_str+": " + line)
+            if config['debug'] > 0 :
+               self._log("Req  "+req_str+": " + line)
             response = proximus_class.check_request(settings, line)
-            self._log("Resp "+req_str+": " + response)
             self._writeline(response)
+            if config['debug'] > 0 :
+               self._log("Resp "+req_str+": " + response)
          line = self._readline()
 
 if __name__ == "__main__":
