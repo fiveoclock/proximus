@@ -1,0 +1,10 @@
+#! /bin/sh
+# postinst script for proximus
+#
+# see: dh_installdeb(1)
+
+set -e
+
+echo Reloading Squid to use new Proximus package
+invoke-rc.d squid reload
+
