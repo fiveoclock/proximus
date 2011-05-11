@@ -21,6 +21,8 @@ if ($dirty_config == true) {
    exec("/etc/init.d/squid status", $out, $retval);
    if ($retval == 0) {
       #echo "Reloading Squid config now...";
+      openlog("Proximus-noauth", LOG_PID | LOG_PERROR, LOG_LOCAL0);
+      syslog ( LOG_WARNING, "No-auth lists were updated. Reloading Squid config..." );
       exec("/etc/init.d/squid reload", $out, $retval);
    }
 }
