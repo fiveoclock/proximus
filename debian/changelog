@@ -1,3 +1,9 @@
+proximus (0.1.2-2) lenny; urgency=low
+
+  * dont log every request by default
+
+ -- Alexander Ganster <alexander.ganster@mm-karton.com>  Wed, 11 May 2011 19:17:28 +0200
+
 proximus (0.1.2-1) lenny; urgency=low
 
   * packaging: fix target distribution
