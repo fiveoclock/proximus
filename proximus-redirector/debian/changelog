@@ -1,3 +1,9 @@
+proximus (0.1.3) lenny; urgency=low
+
+  * allow to limit noauth rules to location and add an expiration date
+
+ -- Alexander Ganster <alexander.ganster@mm-karton.com>  Tue, 17 May 2011 10:54:29 +0200
+
 proximus (0.1.2-2) lenny; urgency=low
 
   * dont log every request by default
