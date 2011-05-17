@@ -1,4 +1,4 @@
-This package was debianized by Andreas Unterkircher <unki@mm-karton.com> on
+This package was debianized by Alexander Ganster <alexander.ganster@gmail.com> on
 Sat, 29 Nov 2008 07:57:19 +0100.
 
 It was downloaded from <fill in http/ftp site>
@@ -27,7 +27,7 @@ License:
 On Debian systems, the complete text of the GNU General
 Public License can be found in `/usr/share/common-licenses/GPL'.
 
-The Debian packaging is (C) 2008, Andreas Unterkircher <unki@mm-karton.com> and
+The Debian packaging is (C) 2008, Alexander Ganster <alexander.ganster@gmail.com> and
 is licensed under the GPL, see above.
 
 

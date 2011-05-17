@@ -1,8 +1,8 @@
 Source: proximus
 Section: net
 Priority: extra
-Maintainer: Alexander Ganster <alexander.ganster@mm-karton.com>
-Uploaders: Alexander Ganster <alexander.ganster@mm-karton.com>
+Maintainer: Alexander Ganster <alexander.ganster@gmail.com>
+Uploaders: Alexander Ganster <alexander.ganster@gmail.com>
 Build-Depends: debhelper (>= 5)
 Standards-Version: 3.7.3
 Homepage: http://www.proximus.org
