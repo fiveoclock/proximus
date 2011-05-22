@@ -1,12 +1,12 @@
 #!/usr/bin/perl
-## MM Proximus Gate Script
+## Proximus Gate Script
 
-# This script will insert all MM Users which are in the Internet group into a Mysql-Database
+# This script will insert all Users which are in the Internet group into a Mysql-Database
 # written by vieaga - Alexander Ganster
 
 # v1.2 vieaga 12.04.10 - reduce number of update statements - only update userinformation that has really changed
 # v1.1 vieaga - added more debugging + only deactivate users instead of deleting them
-# v1.0 vieaga - Modification of Unkis MM Mailing Script
+# v1.0 vieaga - Modification of Unkis Mailing Script
 
 use DBI;
 
@@ -14,7 +14,7 @@ my $mysql_user = "!!! please set";
 my $mysql_pass = "!!! please set";
 my $mysql_db   = "!!! please set";
 my $mysql_host = "!!! please set";
-my $mmAD       = "C:\\tools\\Proxy\\MM_User.dat";
+my $exportAD       = "C:\\tools\\Proxy\\dom_User.dat";
 
 my @locations;
 my %locations_hashtable = ();
@@ -33,7 +33,7 @@ $dbh = DBI->connect("DBI:mysql:". $mysql_db .":". $mysql_host, $mysql_user, $mys
 printMsg("Connected to MySQL database.");
 
 # Readin AD export into memory
-open(ADDUMP, $mmAD) or dieMsg("Can't read Active Directory export");
+open(ADDUMP, $exportAD) or dieMsg("Can't read Active Directory export");
 @addump = <ADDUMP>;
 close(ADDUMP);
 

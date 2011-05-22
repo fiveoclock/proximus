@@ -1,0 +1,6 @@
+the scripts provided are just to give you an idea how to realize a sync script
+
+in this case there is a AD group called "Internet-access", only users in that group
+are allowed to use the proxy...
+
+

@@ -9,10 +9,10 @@
 ' VERSION: 1.01
 '
 ' COMMENT: 
-' Retrieve only all "enabled" AD User Objects which are members of one of following groups: (for both domains MMG und MMK) 
-'	- cn=MM-Internet,ou=!Ress,dc=mmk,dc=mmdom,dc=net"
-'	- cn=MMG-Internet,ou=!Ress,dc=mmg,dc=mmdom,dc=net"
-'	- cn=MMDOM-Internet,ou=!Ress,dc=mmdom,dc=net"
+' Retrieve only all "enabled" AD User Objects which are members of one of following groups: (for both domains dom2 und dom1) 
+'	- cn=Internet-access,ou=!Ress,dc=dom1,dc=mmdom,dc=net"
+'	- cn=dom2-Internet,ou=!Ress,dc=dom2,dc=mmdom,dc=net"
+'	- cn=DOM-Internet,ou=!Ress,dc=mmdom,dc=net"
 '
 ' v1.00 / VIERRI / Initial Script
 ' v1.01 / VIERRI / Don´t output Header line 
@@ -36,15 +36,15 @@ Dim strCsvFilename
 Dim anzLdapSearch, anzLdapSearchFound
 
 strProperties = "canonicalName,sAMAccountName,distinguishedName,displayName,proxyAddresses"
-strGroupDN_MMK = "cn=MM-Internet,ou=!Ress,dc=mmk,dc=mmdom,dc=net"
-strDomain_MMK = "MMK"
-strGroupDN_MMG = "cn=MMG-Internet,ou=!Ress,dc=mmg,dc=mmdom,dc=net"
-strDomain_MMG = "MMG"
-strGroupDN_MMDOM = "cn=MMDOM-Internet,ou=!Ress,dc=mmdom,dc=net"
-strDomain_MMDOM = "MMDOM"
-strGroupDN = strGroupDN_MMK
+strGroupDN_dom1 = "cn=Internet-access,ou=!Ress,dc=dom1,dc=mmdom,dc=net"
+strDomain_dom1 = "dom1"
+strGroupDN_dom2 = "cn=dom2-Internet,ou=!Ress,dc=dom2,dc=mmdom,dc=net"
+strDomain_dom2 = "dom2"
+strGroupDN_DOM = "cn=DOM-Internet,ou=!Ress,dc=mmdom,dc=net"
+strDomain_DOM = "DOM"
+strGroupDN = strGroupDN_dom1
 
-'strTestUser = "LDAP://dc-vie-50.mmk.mmdom.net/CN=Riegler Robert,OU=WKS-User,OU=User,OU=IT,OU=VIE,DC=mmk,DC=mmdom,DC=net"
+'strTestUser = "LDAP://dc-vie-50.dom1.mmdom.net/CN=Riegler Robert,OU=WKS-User,OU=User,OU=IT,OU=VIE,DC=dom1,DC=mmdom,DC=net"
 strLdapServer = "srv-vie-03"
 
 strFilename = "C:\Tools\Proxy\User"
@@ -85,13 +85,13 @@ If objArgs.Count <> 0 Then
     	WScript.Echo "	There is a Config-File: SiemensTel_Kopfnummern.ini which is used to deside where to write the data"
     	WScript.Echo "		* If the Kopfnummer is in the File --> the data gets written into the INTERNAL File"
     	WScript.Echo
-	    WScript.Echo "	zB.: MMK --> cscript ADexport_forProxy.vbs dc-vie-50 ALL (gets all MMK enabled REAL Users, No SystemUsers)"
-	    WScript.Echo "	zB.: MMK --> cscript ADexport_forProxy.vbs dc-vie-50 SLG 0 (gets only REAL Users, No SystemUsers)"
-    	WScript.Echo "	zB.: MMK --> cscript ADexport_forProxy.vbs dc-vie-50 SLG 1 (gets only SYSTEM Users)"
-	    WScript.Echo "	zB.: MMK --> cscript ADexport_forProxy.vbs dc-vie-50 SLG 2 (gets ALL Users)"
-   	    WScript.Echo "	zB.: MMK --> cscript ADexport_forProxy.vbs dc-vie-50 ALL (gets all MMK enabled REAL Users, No SystemUsers)"
-    	WScript.Echo "	zB.: MMG --> cscript ADexport_forProxy.vbs dc-gvie-50 GIN 1"
-    	WScript.Echo "	zB.: MMG --> cscript ADexport_forProxy.vbs dc-gvie-50 GIN (gets only REAL ENABLED Users, No SystemUsers)"
+	    WScript.Echo "	zB.: dom1 --> cscript ADexport_forProxy.vbs dc-vie-50 ALL (gets all dom1 enabled REAL Users, No SystemUsers)"
+	    WScript.Echo "	zB.: dom1 --> cscript ADexport_forProxy.vbs dc-vie-50 SLG 0 (gets only REAL Users, No SystemUsers)"
+    	WScript.Echo "	zB.: dom1 --> cscript ADexport_forProxy.vbs dc-vie-50 SLG 1 (gets only SYSTEM Users)"
+	    WScript.Echo "	zB.: dom1 --> cscript ADexport_forProxy.vbs dc-vie-50 SLG 2 (gets ALL Users)"
+   	    WScript.Echo "	zB.: dom1 --> cscript ADexport_forProxy.vbs dc-vie-50 ALL (gets all dom1 enabled REAL Users, No SystemUsers)"
+    	WScript.Echo "	zB.: dom2 --> cscript ADexport_forProxy.vbs dc-gvie-50 GIN 1"
+    	WScript.Echo "	zB.: dom2 --> cscript ADexport_forProxy.vbs dc-gvie-50 GIN (gets only REAL ENABLED Users, No SystemUsers)"
 
 	    WScript.Quit
     Else
@@ -176,17 +176,17 @@ objConnection.Open "Active Directory Provider"
 Set objCommand.ActiveConnection = objConnection
 objCommand.Properties("Page Size") = 1000
 
-If UCase(domainContainer) = "DC=MMK,DC=MMDOM,DC=NET" then
-	strGroupDN = strGroupDN_MMK
-	strDomain = strDomain_MMK
+If UCase(domainContainer) = "DC=dom1,DC=DOM,DC=NET" then
+	strGroupDN = strGroupDN_dom1
+	strDomain = strDomain_dom1
 End If
-If UCase(domainContainer) = "DC=MMG,DC=MMDOM,DC=NET" then
-	strGroupDN = strGroupDN_MMG
-	strDomain = strDomain_MMG
+If UCase(domainContainer) = "DC=dom2,DC=DOM,DC=NET" then
+	strGroupDN = strGroupDN_dom2
+	strDomain = strDomain_dom2
 End If
-If UCase(domainContainer) = "DC=MMDOM,DC=NET" then
-	strGroupDN = strGroupDN_MMDOM
-	strDomain = strDomain_MMDOM
+If UCase(domainContainer) = "DC=DOM,DC=NET" then
+	strGroupDN = strGroupDN_DOM
+	strDomain = strDomain_DOM
 End If
 
 
