@@ -299,6 +299,19 @@ def fetch_userinfo(ident):
    #src_address = escape(src_address)
 
 
+# tests if a ip address is within a subnet
+def addressInNetwork(ip, net):
+   import socket,struct
+   try:
+      ipaddr = int(''.join([ '%02x' % int(x) for x in ip.split('.') ]), 16)
+      netstr, bits = net.split('/')
+      netaddr = int(''.join([ '%02x' % int(x) for x in netstr.split('.') ]), 16)
+      mask = (0xffffffff << (32 - int(bits))) & 0xffffffff
+      return (ipaddr & mask) == (netaddr & mask)
+   except ValueError:
+      return False;
+
+
 def check_request(passed_settings, line):
    global settings, request, user
    settings = passed_settings
@@ -312,6 +325,24 @@ def check_request(passed_settings, line):
    # allow access to to proximuslog website
    if request['sitename'] == settings['redirection_host'] :
       return grant()
+
+
+   ######
+   ## Global blocked network check
+   ##
+   db_cursor.execute ("SELECT network \
+            FROM blockednetworks \
+            WHERE \
+                  ( location_id = %s \
+                  OR location_id = 1 ) ",
+            (settings['location_id'] ))
+   rows = db_cursor.fetchall()
+   for row in rows:
+      if request['src_address'] == row[0] :
+         return deny();
+      if addressInNetwork( request['src_address'] ,  row[1] ) :
+         return deny();
+
 
    ######
    ## Global no-auth check
