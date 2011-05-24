@@ -311,11 +311,6 @@ def addressInNetwork(ip, net):
    except ValueError:
       return False;
 
-def calcDottedNetmask(mask):
-    bits = 0
-    for i in xrange(32-int(mask),32):
-        bits |= (1 > 24, (bits & 0xff0000) >> 16, (bits & 0xff00) >> 8 , (bits & 0xff))
-
 
 def check_request(passed_settings, line):
    global settings, request, user
