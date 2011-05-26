@@ -10,18 +10,17 @@ For more information visit:
 * the homepage - http://proximus.5-o-clock.net
 * the wiki - https://github.com/fiveoclock/proximus/wiki
 
+
 <img src="https://github.com/fiveoclock/fiveoclock.github.com/raw/master/proximus/images/screenie.png" />
 
 
-Installation 
-================
+## Installation 
 
 For instructions on how to install ProXimus refer to the Github wiki:
 https://github.com/fiveoclock/proximus/wiki/Installation
 
 
-Contributor list
-================
+## Contributor list
 
 ProXimus was mainly written by 
 * Ivan Samarin
@@ -30,8 +29,7 @@ ProXimus was mainly written by
 If you want to help develop ProXimmus get in contact with us over Github.
 
 
-Licensing
-================
+## Licensing
 
 See COPYING for license info
 
