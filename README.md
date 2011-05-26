@@ -6,6 +6,7 @@ interface to easily configure access rules for users. It is integrated into
 Squid as a redirector program.
 
 For more information visit:
+
 * the homepage - http://proximus.5-o-clock.net
 * the wiki - https://github.com/fiveoclock/proximus/wiki
 
