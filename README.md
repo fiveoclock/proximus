@@ -43,6 +43,7 @@ For more information visit:
 ## Contributor list
 
 ProXimus was mainly written by 
+
 * Ivan Samarin
 * Alexander Ganster
 
