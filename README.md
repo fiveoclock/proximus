@@ -1,6 +1,6 @@
 <img src="https://github.com/fiveoclock/proximus/raw/master/proximus-redirector/srv/www/proximus/img/logo.png" />
 
-ProXimus is an enterprise scale solution to manage access control for the Squid proxy server http://www.squid-cache.org/. 
+ProXimus is an open source enterprise scale solution to manage access control for the Squid proxy server http://www.squid-cache.org/. 
 
 It offers a web-based management interface to easily configure access rules for users. It is integrated into Squid as a redirector program.
 
