@@ -340,7 +340,7 @@ def check_request(passed_settings, line):
    for row in rows:
       if request['src_address'] == row[0] :
          return deny();
-      if addressInNetwork( request['src_address'] ,  row[1] ) :
+      if addressInNetwork( request['src_address'] ,  row[0] ) :
          return deny();
 
 
