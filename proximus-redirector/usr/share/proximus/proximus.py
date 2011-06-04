@@ -23,6 +23,33 @@ request = {'sitename':None, 'sitename_save':None, 'protocol':None, 'siteport':No
 user = {'ident':None, 'id':None, 'name':None, 'loc_id':None, 'group_id':None, 'email':None }
 
 class Proximus:
+   def __init__(self):
+      syslog.openlog('proximus',syslog.LOG_PID,syslog.LOG_LOCAL5)
+      self.stdin   = sys.stdin
+      self.stdout  = sys.stdout
+
+      global config, settings
+      self.read_config()
+      # Get the fully-qualified name.
+      hostname = socket.gethostname()
+      fqdn_hostname = socket.getfqdn(hostname)
+      self.db_connect()
+
+      # Get relevant proxy settings and catch error if no settings exist in db
+      try:
+         db_cursor.execute ("SELECT location_id, redirection_host, smtpserver, admin_email, admincc, subsite_sharing, mail_interval, retrain_key, regex_cut \
+                           FROM proxy_settings, global_settings \
+                           WHERE \
+                                 fqdn_proxy_hostname = %s", ( fqdn_hostname ))
+         query = db_cursor.fetchone()
+         settings = {'location_id':query[0], 'redirection_host':query[1], 'smtpserver':query[2], 'admin_email':query[3], 'admincc':query[4], 'subsite_sharing':query[5], 'mail_interval':query[6], 'retrain_key':query[7], 'regex_cut':query[8], 'db_cursor':db_cursor, 'debug':config['debug'], 'web_path':config['web_path'] }
+      except :
+         error_msg = "ERROR: please make sure that a config for this node is stored in the database. Table-name: proxy_settings - Full qualified domain name: "+fqdn_hostname
+         self.log("ERROR: activating passthrough-mode until config is present")
+         self.log(error_msg)
+         self._writeline(error_msg)
+         config['passthrough'] = True
+
    def db_connect(self):
       global db_cursor, config
 
@@ -81,33 +108,6 @@ class Proximus:
       else :
          config['debug'] = 0
  
-   def __init__(self):
-      syslog.openlog('proximus',syslog.LOG_PID,syslog.LOG_LOCAL5)
-      self.stdin   = sys.stdin
-      self.stdout  = sys.stdout
-
-      global config, settings
-      self.read_config()
-      # Get the fully-qualified name.
-      hostname = socket.gethostname()
-      fqdn_hostname = socket.getfqdn(hostname)
-      self.db_connect()
-
-      # Get relevant proxy settings and catch error if no settings exist in db
-      try:
-         db_cursor.execute ("SELECT location_id, redirection_host, smtpserver, admin_email, admincc, subsite_sharing, mail_interval, retrain_key, regex_cut \
-                           FROM proxy_settings, global_settings \
-                           WHERE \
-                                 fqdn_proxy_hostname = %s", ( fqdn_hostname ))
-         query = db_cursor.fetchone()
-         settings = {'location_id':query[0], 'redirection_host':query[1], 'smtpserver':query[2], 'admin_email':query[3], 'admincc':query[4], 'subsite_sharing':query[5], 'mail_interval':query[6], 'retrain_key':query[7], 'regex_cut':query[8], 'db_cursor':db_cursor, 'debug':config['debug'], 'web_path':config['web_path'] }
-      except :
-         error_msg = "ERROR: please make sure that a config for this node is stored in the database. Table-name: proxy_settings - Full qualified domain name: "+fqdn_hostname
-         self.log("ERROR: activating passthrough-mode until config is present")
-         self.log(error_msg)
-         self._writeline(error_msg)
-         config['passthrough'] = True
- 
 
    def _readline(self):
       "Returns one unbuffered line from squid."
@@ -144,7 +144,7 @@ class Proximus:
 
    ################
    ################
-   ## functions
+   ## Request processing
    ########
    ########
 
@@ -246,7 +246,7 @@ class Proximus:
                         ", (user['id'], request['protocol'], "REDIRECT", request['sitename'], request['sitename']))
       dyn = db_cursor.fetchone()
       if (dyn != None) :   # user is allowed to access this site
-         if settings['debug'] >= 1 :
+         if settings['debug'] >= 2 :
             log("Debug REDIRECT; Log found; Log-id="+str(dyn[1])+" Site="+dyn[0]+" Source="+dyn[2])
          request['id'] = dyn[1]
          s.redirect_log_hit(request['id'])
@@ -275,7 +275,7 @@ class Proximus:
          for row1 in rows1:
             for row2 in rows2:
                if row1[0] == row2[0] :
-                  if settings['debug'] >= 1 :
+                  if settings['debug'] >= 2 :
                      s.log("Debug REDIRECT; Log found with subsite sharing - own_parents; Log-id="+str(rows1[1]))
                   return s.grant()
       elif settings['subsite_sharing'] == "all_parents" :  # check if someone else has already added this site as a children 
@@ -290,12 +290,12 @@ class Proximus:
                            ", ("REDIRECT", request['sitename'], request['sitename']))
          all = db_cursor.fetchone()
          if (all != None) :
-            if settings['debug'] >= 1 :
+            if settings['debug'] >= 2 :
                s.log("Debug REDIRECT; Log found with subsite sharing - all_parents; Log-id="+str(all[1]))
             return s.grant()
 
       # if we get here user is not yet allowed to access this site
-      if settings['debug'] >= 1 :
+      if settings['debug'] >= 2 :
          s.log("Debug REDIRECT; No log found; DENY")
       # log request
       s.redirect_log()
@@ -480,7 +480,7 @@ class Proximus:
       if user['id'] == None :
          # since squid is configured to require user auth
          # and no user identification is sent the site must be in the no-auth table
-         if settings['debug'] >= 1 :
+         if settings['debug'] >= 2 :
             s.log("Debug; ALLOW - Request with no user-id - looks like a NoAuth rule ;-)")
          return s.grant()
       #else :
@@ -528,7 +528,7 @@ class Proximus:
                   (user['group_id'], user['loc_id'], request['sitename'], request['sitename'], request['protocol']))
       rows = db_cursor.fetchall()
       for row in rows:
-         if settings['debug'] >= 1 :
+         if settings['debug'] >= 2 :
             s.log("Debug; Rule found; id="+str(row[0])+" Site="+row[1]+" Action="+row[2]+" Location="+str(row[3])+" Group="+str(row[4])+" Prio="+str(row[5])+" Desc="+row[6])
          if row[2] == "ALLOW" :
             return s.grant()
@@ -543,7 +543,7 @@ class Proximus:
             s.learn()
             return s.grant()
 
-      if settings['debug'] >= 1 :
+      if settings['debug'] >= 2 :
          s.log("Debug; no rule found; using default deny")
 
       # deny access if the request was not accepted until this point ;-)
