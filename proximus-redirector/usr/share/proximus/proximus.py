@@ -197,7 +197,7 @@ class Proximus:
                            VALUES (%s, %s, %s, %s, %s, %s, NOW()) \
                   ", (request['sitename_save'], request['src_address'], user['id'], settings['location_id'], request['protocol'], "LEARN"))
       else :
-         request['id'] = dyn[0]
+         request['id'] = dyn['id']
          db_cursor.execute ("UPDATE logs SET hitcount=hitcount+1 \
                               WHERE id = %s ", ( request['id'] ) )
 
