@@ -2,9 +2,11 @@
 
 import sys,string
 import MySQLdb
+import MySQLdb.cursors
 import os
 import socket
 import syslog
+import pprint # for debugging
 
 import urlparse
 import re
@@ -24,31 +26,49 @@ user = {'ident':None, 'id':None, 'name':None, 'loc_id':None, 'group_id':None, 'e
 
 class Proximus:
    def __init__(self):
+      global config, settings
+
+      # configure syslog
       syslog.openlog('proximus',syslog.LOG_PID,syslog.LOG_LOCAL5)
       self.stdin   = sys.stdin
       self.stdout  = sys.stdout
 
-      global config, settings
-      self.read_config()
       # Get the fully-qualified name.
       hostname = socket.gethostname()
       fqdn_hostname = socket.getfqdn(hostname)
+
+      # read config file and connect to the database
+      self.read_configfile()
       self.db_connect()
 
-      # Get relevant proxy settings and catch error if no settings exist in db
+      # Get settings from db and catch error if no settings are stored
       try:
-         db_cursor.execute ("SELECT location_id, redirection_host, smtpserver, admin_email, admincc, subsite_sharing, mail_interval, retrain_key, regex_cut \
-                           FROM proxy_settings, global_settings \
-                           WHERE \
-                                 fqdn_proxy_hostname = %s", ( fqdn_hostname ))
+         # Get proxy specific settings
+         db_cursor.execute ("SELECT location_id, redirection_host, smtpserver, admin_email, admincc \
+                           FROM proxy_settings \
+                           WHERE fqdn_proxy_hostname = %s", ( fqdn_hostname ))
          query = db_cursor.fetchone()
-         settings = {'location_id':query[0], 'redirection_host':query[1], 'smtpserver':query[2], 'admin_email':query[3], 'admincc':query[4], 'subsite_sharing':query[5], 'mail_interval':query[6], 'retrain_key':query[7], 'regex_cut':query[8], 'db_cursor':db_cursor, 'debug':config['debug'], 'web_path':config['web_path'] }
+         settings = query
+
+         # Get global settings
+         db_cursor.execute ("SELECT name, value FROM global_settings")
+         query = db_cursor.fetchall()
+         for row in query:
+            settings[row['name']] = row['value']
+
+         # combine with settings from configfile
+         settings = dict(settings, **config)
+         #pprint.pprint(settings)  ## debug 
+      
+      # catch error if no settings are stored;
+      # and activate passthrough mode
       except :
          error_msg = "ERROR: please make sure that a config for this node is stored in the database. Table-name: proxy_settings - Full qualified domain name: "+fqdn_hostname
          self.log("ERROR: activating passthrough-mode until config is present")
          self.log(error_msg)
          self._writeline(error_msg)
          config['passthrough'] = True
+
 
    def db_connect(self):
       global db_cursor, config
@@ -57,7 +77,7 @@ class Proximus:
          conn = MySQLdb.connect (host = config['db_host'],
             user = config['db_user'],
             passwd = config['db_pass'],
-            db = config['db_name'])
+            db = config['db_name'], cursorclass=MySQLdb.cursors.DictCursor)
          db_cursor = conn.cursor ()
       except MySQLdb.Error, e:
          error_msg = "ERROR: please make sure that database settings are correctly set in "+config_filename
@@ -67,7 +87,7 @@ class Proximus:
          self.log(error_msg)
          self._writeline(error_msg)
 
-   def read_config(self):
+   def read_configfile(self):
       global config
       try:
          config_file = open(config_filename, 'r')
