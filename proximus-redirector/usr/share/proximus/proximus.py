@@ -263,7 +263,7 @@ class Proximus:
       dyn = db_cursor.fetchone()
       if (dyn != None) :   # user is allowed to access this site
          if settings['debug'] >= 2 :
-            log("Debug REDIRECT; Log found; " + pprint.pformat(dyn) )
+            s.log("Debug REDIRECT; Log found; " + pprint.pformat(dyn) )
          request['id'] = dyn['id']
          s.redirect_log_hit(request['id'])
          return s.grant()
