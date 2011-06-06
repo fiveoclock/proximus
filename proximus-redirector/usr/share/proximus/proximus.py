@@ -22,11 +22,11 @@ passthrough_filename = "/etc/proximus/passthrough"
 # define globaly used variables
 settings = {}
 request = {'sitename':None, 'sitename_save':None, 'protocol':None, 'siteport':None, 'src_address':None, 'url':None, 'redirection_method':None, 'id':None }
-user = {'ident':None, 'id':None, 'name':None, 'loc_id':None, 'group_id':None, 'email':None }
+user = {'ident':None, 'id':None, 'username':None, 'location_id':None, 'group_id':None, 'emailaddress':None }
 
 class Proximus:
    def __init__(self):
-      global config, settings
+      global db_cursor, config, settings
 
       # configure syslog
       syslog.openlog('proximus',syslog.LOG_PID,syslog.LOG_LOCAL5)
@@ -204,8 +204,7 @@ class Proximus:
 
    # checks if a redirect has been logged and writes it into the db if not..
    def redirect_log(s):
-      global settings, request, user
-      db_cursor = settings['db_cursor']
+      global db_cursor, settings, request, user
 
       db_cursor.execute ("INSERT INTO logs (sitename, ipaddress, user_id, protocol, location_id, source, created, hitcount) \
                            VALUES (%s, %s, %s, %s, %s, %s, NOW(), %s) \
@@ -216,15 +215,13 @@ class Proximus:
 
    # checks if a redirect has been logged and writes it into the db if not..
    def redirect_log_hit(s, id):
-      global settings, request, user
-      db_cursor = settings['db_cursor']
+      global db_cursor, settings, request, user
       db_cursor.execute ("UPDATE logs SET hitcount=hitcount+1 WHERE id = %s", (request['id']))
 
 
    # send redirect to the browser
    def redirect_send(s):
-      global settings, request, user
-      db_cursor = settings['db_cursor']
+      global db_cursor, settings, request, user
 
       if request['protocol'] == "SSL" :
          # default redirection method - if not further specified
@@ -237,8 +234,7 @@ class Proximus:
 
    # called when a request is redirected
    def redirect(s):
-      global settings, request, user
-      db_cursor = settings['db_cursor']
+      global db_cursor, settings, request, user
 
       if request['sitename'].startswith(settings['retrain_key']) :
          key = settings['retrain_key']
@@ -267,12 +263,12 @@ class Proximus:
       dyn = db_cursor.fetchone()
       if (dyn != None) :   # user is allowed to access this site
          if settings['debug'] >= 2 :
-            log("Debug REDIRECT; Log found; Log-id="+str(dyn[1])+" Site="+dyn[0]+" Source="+dyn[2])
-         request['id'] = dyn[1]
+            log("Debug REDIRECT; Log found; " + pprint.pformat(dyn) )
+         request['id'] = dyn['id']
          s.redirect_log_hit(request['id'])
          return s.grant()
       elif settings['subsite_sharing'] == "own_parents" :    # check if someone else has already added this site as a children
-         db_cursor.execute ("SELECT log2.sitename, log2.id \
+         db_cursor.execute ("SELECT log2.sitename AS sitename, log2.id AS id \
                            FROM logs AS log1, logs AS log2 \
                            WHERE \
                                  log1.parent_id = log2.id \
@@ -294,9 +290,9 @@ class Proximus:
 
          for row1 in rows1:
             for row2 in rows2:
-               if row1[0] == row2[0] :
+               if row1['sitename'] == row2['sitename'] :
                   if settings['debug'] >= 2 :
-                     s.log("Debug REDIRECT; Log found with subsite sharing - own_parents; Log-id="+str(rows1[1]))
+                     s.log("Debug REDIRECT; Log found with subsite sharing - own_parents; Log-id="+str(rows1['id']))
                   return s.grant()
       elif settings['subsite_sharing'] == "all_parents" :  # check if someone else has already added this site as a children 
          db_cursor.execute ("SELECT sitename, id \
@@ -311,7 +307,7 @@ class Proximus:
          all = db_cursor.fetchone()
          if (all != None) :
             if settings['debug'] >= 2 :
-               s.log("Debug REDIRECT; Log found with subsite sharing - all_parents; Log-id="+str(all[1]))
+               s.log("Debug REDIRECT; Log found with subsite sharing - all_parents; Log-id="+str(all['id']))
             return s.grant()
 
       # if we get here user is not yet allowed to access this site
@@ -332,7 +328,7 @@ class Proximus:
       if settings['admincc'] == 1 :
          msg['Cc'] = settings['admin_email']
          smtp.sendmail(settings['admin_email'], settings['admin_email'], msg.as_string())
-      smtp.sendmail(settings['admin_email'], user['email'], msg.as_string())
+      smtp.sendmail(settings['admin_email'], user['emailaddress'], msg.as_string())
       smtp.close()
 
 
@@ -340,7 +336,7 @@ class Proximus:
       global settings, user, request
 
       # if user doesn't have an email address skip the part below
-      if user['email'] == "":
+      if user['emailaddress'] == "":
          return s.deny()
 
       # check if mail has already been sent
@@ -419,28 +415,24 @@ class Proximus:
 
 
    def fetch_userinfo(s, ident):
-      global settings, user
+      global db_cursor, settings, user
       user = {}
 
       if ident != "-" :
          # get user
          try:
-            db_cursor = settings['db_cursor']
             db_cursor.execute ("SELECT id, username, location_id, emailaddress, group_id FROM users WHERE username = %s AND active = 'Y'", ident)
-            row = db_cursor.fetchone()
-            user['id'] = row[0]
-            user['name'] = row[1]
-            user['loc_id'] = row[2]
-            user['email'] = row[3].rstrip('\n')
-            user['group_id'] = row[4]
+            user = db_cursor.fetchone()
+            user['emailaddress'] = user['emailaddress'].rstrip('\n')
          except TypeError:
             user['id'] = None
       else :
          user['id'] = None
 
-      if settings['debug'] >= 1 :
+      #pprint.pprint(user)   ## debug
+      if settings['debug'] >= 2 :
          if user['id'] != None :
-            s.log("Debug; User found; id="+str(user['id'])+" locationid="+str(user['loc_id'])+" groupid="+str(user['group_id']) )
+            s.log("Debug; User found; id="+str(user['id'])+" locationid="+str(user['location_id'])+" groupid="+str(user['group_id']) )
          else :
             s.log("Debug; No User found; ident="+ident)
     
@@ -464,9 +456,9 @@ class Proximus:
 
 
    def check_request(s, line):
-      global settings, request, user
+      global db_cursor, settings, request, user
 
-      db_cursor = settings['db_cursor']
+      #bdb_cursor = settings['db_cursor']
 
       if s.parse_line(line) == False:
          return s.deny()
@@ -488,9 +480,9 @@ class Proximus:
                (settings['location_id'] ))
       rows = db_cursor.fetchall()
       for row in rows:
-         if request['src_address'] == row[0] :
+         if request['src_address'] == row['network'] :
             return s.deny();
-         if s.addressInNetwork( request['src_address'] ,  row[0] ) :
+         if s.addressInNetwork( request['src_address'] ,  row['network'] ) :
             return s.deny();
 
 
@@ -545,21 +537,21 @@ class Proximus:
                         ( starttime is NULL AND endtime is NULL OR \
                         starttime <= NOW() AND NOW() <= endtime ) \
                   ORDER BY priority DESC, location_id",
-                  (user['group_id'], user['loc_id'], request['sitename'], request['sitename'], request['protocol']))
-      rows = db_cursor.fetchall()
-      for row in rows:
+                  (user['group_id'], user['location_id'], request['sitename'], request['sitename'], request['protocol']))
+      rules = db_cursor.fetchall()
+      for rule in rules:
          if settings['debug'] >= 2 :
-            s.log("Debug; Rule found; id="+str(row[0])+" Site="+row[1]+" Action="+row[2]+" Location="+str(row[3])+" Group="+str(row[4])+" Prio="+str(row[5])+" Desc="+row[6])
-         if row[2] == "ALLOW" :
+            s.log("Debug; Rule found; " + pprint.pformat(rule))
+         if rule['policy'] == "ALLOW" :
             return s.grant()
-         elif row[2].startswith("REDIRECT") :
-            request['redirection_method'] = row[2]
+         elif rule['policy'].startswith("REDIRECT") :
+            request['redirection_method'] = rule['policy']
             return s.redirect()
-         elif row[2] == "DENY_MAIL" :
+         elif rule['policy'] == "DENY_MAIL" :
             return s.deny_mail_user()
-         elif row[2] == "DENY" :
+         elif rule['policy'] == "DENY" :
             return s.deny()
-         elif row[2] == "LEARN" :
+         elif rule['policy'] == "LEARN" :
             s.learn()
             return s.grant()
 
