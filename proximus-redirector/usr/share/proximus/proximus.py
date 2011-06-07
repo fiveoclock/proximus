@@ -3,17 +3,19 @@
 import sys,string
 import MySQLdb
 import MySQLdb.cursors
-import os
+import os, signal
 import socket
 import syslog
 import pprint # for debugging
 
 import urlparse
 import re
-import sys,string
 import base64
 import smtplib
 from email.MIMEText import MIMEText
+
+from apscheduler.scheduler import Scheduler
+
 
 config = {}
 config_filename = "/etc/proximus/proximus.conf"
@@ -40,6 +42,16 @@ class Proximus:
       # read config file and connect to the database
       self.read_configfile()
       self.db_connect()
+
+      # prepare socket
+      self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+      self.s.setblocking(False)
+
+      # Start the scheduler
+      self.sched = Scheduler()
+      self.sched.start()
+      # Schedule job_function to be called
+      self.job_bind = self.sched.add_interval_job(self.job_testbind, seconds=5)
 
       # Get settings from db and catch error if no settings are stored
       try:
@@ -68,7 +80,6 @@ class Proximus:
          self.log(error_msg)
          self._writeline(error_msg)
          config['passthrough'] = True
-
 
    def db_connect(self):
       global db_cursor, config
@@ -127,7 +138,25 @@ class Proximus:
          config['debug'] = int(config['debug'])
       else :
          config['debug'] = 0
- 
+
+   def job_testbind(self):
+      try:
+         self.s.bind(("127.0.0.1", 34563))
+         self.s.listen(1)
+
+         # deactivate bindtest job
+         self.sched.unschedule_job(self.job_bind)
+         # Schedule job_function to be called every two hours
+         self.sched.add_interval_job(self.job_update, seconds=2)
+         # remove the previous scheduled job
+         self.log("I'm now the master process!")
+      except socket.error, e:
+         None
+
+
+   def job_update(self):
+      #self.log("running.......")
+      None
 
    def _readline(self):
       "Returns one unbuffered line from squid."
@@ -140,21 +169,20 @@ class Proximus:
    def run(self):
       global config, settings
       self.log("started")
-      req_id = 0
+      self.req_id = 0
 
       line = self._readline()
       while line:
          if config['passthrough'] == True :
             self._writeline("")
          else:
-            req_str = str(req_id)
-            req_id = req_id+1
+            self.req_id += 1
             if config['debug'] > 0 :
-               self.log("Req  "+req_str+": " + line)
+               self.log("Req  " + str(self.req_id) + ": " + line)
             response = self.check_request(line)
             self._writeline(response)
             if config['debug'] > 0 :
-               self.log("Resp "+req_str+": " + response)
+               self.log("Resp " + str(self.req_id) + ": " + response)
          line = self._readline()
 
    def log(s, str):
@@ -263,7 +291,7 @@ class Proximus:
       dyn = db_cursor.fetchone()
       if (dyn != None) :   # user is allowed to access this site
          if settings['debug'] >= 2 :
-            s.log("Debug REDIRECT; Log found; " + pprint.pformat(dyn) )
+            s.log("Req  "+ str(s.req_id) +": REDIRECT; Log found; " + pprint.pformat(dyn) )
          request['id'] = dyn['id']
          s.redirect_log_hit(request['id'])
          return s.grant()
@@ -416,7 +444,6 @@ class Proximus:
 
    def fetch_userinfo(s, ident):
       global db_cursor, settings, user
-      user = {}
 
       if ident != "-" :
          # get user
@@ -425,16 +452,16 @@ class Proximus:
             user = db_cursor.fetchone()
             user['emailaddress'] = user['emailaddress'].rstrip('\n')
          except TypeError:
-            user['id'] = None
+            user = None
       else :
-         user['id'] = None
+         user = None
 
       #pprint.pprint(user)   ## debug
       if settings['debug'] >= 2 :
-         if user['id'] != None :
-            s.log("Debug; User found; id="+str(user['id'])+" locationid="+str(user['location_id'])+" groupid="+str(user['group_id']) )
+         if user != None :
+            s.log("Req  "+ str(s.req_id) +": User found; " + pprint.pformat(user) )
          else :
-            s.log("Debug; No User found; ident="+ident)
+            s.log("Req  "+ str(s.req_id) +": No user found; ident="+ident)
     
       # make all vars lowercase to make sure they match
       #sitename = escape(sitename)
@@ -489,11 +516,11 @@ class Proximus:
       ######
       ## Global no-auth check
       ##
-      if user['id'] == None :
+      if user == None :
          # since squid is configured to require user auth
          # and no user identification is sent the site must be in the no-auth table
          if settings['debug'] >= 2 :
-            s.log("Debug; ALLOW - Request with no user-id - looks like a NoAuth rule ;-)")
+            s.log("Req  "+ str(s.req_id) +": ALLOW - Request with no user-id - looks like a NoAuth rule ;-)")
          return s.grant()
       #else :
          # actually this should not be nessecary - the browser should never
@@ -541,7 +568,7 @@ class Proximus:
       rules = db_cursor.fetchall()
       for rule in rules:
          if settings['debug'] >= 2 :
-            s.log("Debug; Rule found; " + pprint.pformat(rule))
+            s.log("Req  "+ str(s.req_id) +": Rule found; " + pprint.pformat(rule))
          if rule['policy'] == "ALLOW" :
             return s.grant()
          elif rule['policy'].startswith("REDIRECT") :
@@ -556,7 +583,7 @@ class Proximus:
             return s.grant()
 
       if settings['debug'] >= 2 :
-         s.log("Debug; no rule found; using default deny")
+         s.log("Req  "+ str(s.req_id) +": no rule found; using default deny")
 
       # deny access if the request was not accepted until this point ;-)
       return s.deny()
