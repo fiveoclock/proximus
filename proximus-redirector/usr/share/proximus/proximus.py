@@ -15,7 +15,7 @@ import smtplib
 from email.MIMEText import MIMEText
 
 from apscheduler.scheduler import Scheduler
-
+import hashlib
 
 config = {}
 config_filename = "/etc/proximus/proximus.conf"
@@ -70,7 +70,6 @@ class Proximus:
 
          # combine with settings from configfile
          settings = dict(settings, **config)
-         #pprint.pprint(settings)  ## debug 
       
       # catch error if no settings are stored;
       # and activate passthrough mode
@@ -80,6 +79,11 @@ class Proximus:
          self.log(error_msg)
          self._writeline(error_msg)
          config['passthrough'] = True
+
+      # debugging....
+      #pprint.pprint(settings)  ## debug
+      if config['debug'] > 0 :
+         self.log("Settings: " + pprint.pformat(settings, 3) )
 
    def db_connect(self):
       global db_cursor, config
@@ -100,10 +104,10 @@ class Proximus:
 
    def read_configfile(self):
       global config
-      try:
-         config_file = open(config_filename, 'r')
-      except :
-         error_msg = "ERROR: config file not found: "+config_filename
+
+      config_file = self.open_file(config_filename, 'r')
+      if config_file == None:
+         error_msg = "ERROR: config file not found: " + config_filename
          self.log(error_msg)
          self._writeline(error_msg)
          sys.exit(1)
@@ -120,7 +124,6 @@ class Proximus:
          (name, value) = line.split("=")
          name = name.strip()
          config[name] = value
-      #print config
       config_file.close()
 
       if os.path.isfile(passthrough_filename) :
@@ -147,7 +150,7 @@ class Proximus:
          # deactivate bindtest job
          self.sched.unschedule_job(self.job_bind)
          # Schedule job_function to be called every two hours
-         self.sched.add_interval_job(self.job_update, seconds=2)
+         self.sched.add_interval_job(self.job_update, seconds=5)
          # remove the previous scheduled job
          self.log("I'm now the master process!")
       except socket.error, e:
@@ -156,7 +159,7 @@ class Proximus:
 
    def job_update(self):
       #self.log("running.......")
-      None
+      self.update_lists()
 
    def _readline(self):
       "Returns one unbuffered line from squid."
@@ -168,9 +171,14 @@ class Proximus:
 
    def run(self):
       global config, settings
+
+      # note for later
+      args = sys.argv[1:]
+      if len(args) >= 1:
+         print "here be some function call... later..."
+
       self.log("started")
       self.req_id = 0
-
       line = self._readline()
       while line:
          if config['passthrough'] == True :
@@ -188,6 +196,68 @@ class Proximus:
    def log(s, str):
       syslog.syslog(syslog.LOG_DEBUG,str)
 
+
+
+   ################
+   ################
+   ## Basic functions
+   ########
+   ########
+
+   def open_file(s, filename, option):
+      try:
+         f = open(filename, option)
+      except :
+         error_msg = "ERROR: cannot open file: " + filename
+         s.log(error_msg)
+      return f
+
+
+   ################
+   ################
+   ## updating of files
+   ########
+   ########
+
+   def update_lists(s):
+      global db_cursor, settings, request, user
+      s.log("Updating lists")
+
+      s.reloadNeeded = False;
+
+      s.update_file("test", "ddk");
+
+
+   def update_file(s, filename, query):
+      global settings
+
+      filename = settings['vardir'] + filename
+      prehash = s.md5_for_file(filename)
+
+      f = s.open_file(filename, 'w')
+      f.write("hsflsdlf")
+      f.close()
+
+      if prehash == s.md5_for_file(filename):
+         s.reloadNeeded = True
+
+
+   def reload_parent(s):
+      self.log("Attention, going to send SIGHUB to my parent process: + " + os.getppid() )
+      os.kill(os.getppid(), signal.SIGHUB)
+
+
+   def md5_for_file(s, filename, block_size=2**20):
+      md5 = hashlib.md5()
+
+      f = s.open_file(filename, 'r')
+      while True:
+         data = f.read(block_size)
+         if not data:
+            break
+         md5.update(data)
+      f.close()
+      return md5.digest()
 
 
    ################
@@ -484,8 +554,6 @@ class Proximus:
 
    def check_request(s, line):
       global db_cursor, settings, request, user
-
-      #bdb_cursor = settings['db_cursor']
 
       if s.parse_line(line) == False:
          return s.deny()
