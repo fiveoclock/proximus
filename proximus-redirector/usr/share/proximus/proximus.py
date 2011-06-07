@@ -221,21 +221,38 @@ class Proximus:
 
    def update_lists(s):
       global db_cursor, settings, request, user
-      s.log("Updating lists")
+      s.log("Updating lists now")
 
-      s.reloadNeeded = False;
+      s.reloadNeeded = False
 
-      s.update_file("test", "ddk");
+      sql = "SELECT sitename, description \
+            FROM noauth_rules \
+            WHERE type='%s' \
+               AND (location_id = %s OR location_id = 1 OR location_id IS NULL) \
+               AND (valid_until IS NULL OR valid_until > NOW())" 
+
+      print(sql % ('IP', settings['location_id']) )
+      print(sql % ('DN', settings['location_id']) )
+
+      s.update_file("testip", sql % ('IP', settings['location_id']) )
+      s.update_file("testdn", sql % ('DN', settings['location_id']) )
+
+      if s.reloadNeeded == True:
+         s.reload_parent()
 
 
    def update_file(s, filename, query):
-      global settings
+      global db_cursor, settings
 
       filename = settings['vardir'] + filename
       prehash = s.md5_for_file(filename)
-
       f = s.open_file(filename, 'w')
-      f.write("hsflsdlf")
+
+      db_cursor.execute (query)
+      rows = db_cursor.fetchall()
+
+      for row in rows:
+         f.write(row['sitename'] + "\n")
       f.close()
 
       if prehash == s.md5_for_file(filename):
@@ -243,8 +260,8 @@ class Proximus:
 
 
    def reload_parent(s):
-      self.log("Attention, going to send SIGHUB to my parent process: + " + os.getppid() )
-      os.kill(os.getppid(), signal.SIGHUB)
+      s.log("Attention, going to send SIGHUB to my parent process: + " + str(os.getppid()) )
+      #os.kill(os.getppid(), signal.SIGHUB)
 
 
    def md5_for_file(s, filename, block_size=2**20):
@@ -276,8 +293,8 @@ class Proximus:
 
    # called when a request has to be learned
    def learn(s):
-      global settings, request, user
-      db_cursor = settings['db_cursor']
+      global db_cursor, settings, request, user
+
       # check if site has already been learned
       db_cursor.execute ("SELECT id \
                         FROM logs \
@@ -431,7 +448,7 @@ class Proximus:
 
 
    def deny_mail_user(s):
-      global settings, user, request
+      global db_curor, settings, user, request
 
       # if user doesn't have an email address skip the part below
       if user['emailaddress'] == "":
