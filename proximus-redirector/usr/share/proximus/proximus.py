@@ -17,7 +17,6 @@ from email.MIMEText import MIMEText
 from apscheduler.scheduler import Scheduler
 import hashlib
 
-config = {}
 config_filename = "/etc/proximus/proximus.conf"
 passthrough_filename = "/etc/proximus/passthrough"
 
@@ -28,20 +27,17 @@ user = {'ident':None, 'id':None, 'username':None, 'location_id':None, 'group_id'
 
 class Proximus:
    def __init__(self):
-      global db_cursor, config, settings
+      global db_cursor, settings
 
       # configure syslog
       syslog.openlog('proximus',syslog.LOG_PID,syslog.LOG_LOCAL5)
       self.stdin   = sys.stdin
       self.stdout  = sys.stdout
 
-      # Get the fully-qualified name.
-      hostname = socket.gethostname()
-      fqdn_hostname = socket.getfqdn(hostname)
-
       # read config file and connect to the database
       self.read_configfile()
       self.db_connect()
+      self.get_settings_from_db()
 
       # prepare socket
       self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -53,77 +49,52 @@ class Proximus:
       # Schedule job_function to be called
       self.job_bind = self.sched.add_interval_job(self.job_testbind, seconds=5)
 
-      # Get settings from db and catch error if no settings are stored
-      try:
-         # Get proxy specific settings
-         db_cursor.execute ("SELECT location_id, redirection_host, smtpserver, admin_email, admincc \
-                           FROM proxy_settings \
-                           WHERE fqdn_proxy_hostname = %s", ( fqdn_hostname ))
-         query = db_cursor.fetchone()
-         settings = query
-
-         # Get global settings
-         db_cursor.execute ("SELECT name, value FROM global_settings")
-         query = db_cursor.fetchall()
-         for row in query:
-            settings[row['name']] = row['value']
-
-         # combine with settings from configfile
-         settings = dict(settings, **config)
-      
-      # catch error if no settings are stored;
-      # and activate passthrough mode
-      except :
-         error_msg = "ERROR: please make sure that a config for this node is stored in the database. Table-name: proxy_settings - Full qualified domain name: "+fqdn_hostname
-         self.log("ERROR: activating passthrough-mode until config is present")
-         self.log(error_msg)
-         self._writeline(error_msg)
-         config['passthrough'] = True
-
       # debugging....
       #pprint.pprint(settings)  ## debug
       self.debug("Settings: " + pprint.pformat(settings, 3), 1 )
 
    def db_connect(self):
-      global db_cursor, config
+      global db_cursor, settings
 
       try:
-         conn = MySQLdb.connect (host = config['db_host'],
-            user = config['db_user'],
-            passwd = config['db_pass'],
-            db = config['db_name'], cursorclass=MySQLdb.cursors.DictCursor)
+         conn = MySQLdb.connect (host = settings['db_host'],
+            user = settings['db_user'],
+            passwd = settings['db_pass'],
+            db = settings['db_name'], cursorclass=MySQLdb.cursors.DictCursor)
          db_cursor = conn.cursor ()
       except MySQLdb.Error, e:
-         error_msg = "ERROR: please make sure that database settings are correctly set in "+config_filename
+         error_msg = "ERROR: please make sure that database settings are correctly set in " + config_filename
          self.log("ERROR: activating passthrough-mode until config is present")
-         config['passthrough'] = True
+         settings['passthrough'] = True
 
          self.log(error_msg)
          self._writeline(error_msg)
 
    def read_configfile(self):
-      global config
+      global settings
 
+      config = {}
       config_file = self.open_file(config_filename, 'r')
+
       if config_file == None:
          error_msg = "ERROR: config file not found: " + config_filename
          self.log(error_msg)
          self._writeline(error_msg)
          sys.exit(1)
-
-      for line in config_file:
-         # Get rid of \n
-         line = line.rstrip()
-         # Empty?
-         if not line:
-            continue
-         # Comment?
-         if line.startswith("#"):
-            continue
-         (name, value) = line.split("=")
-         name = name.strip()
-         config[name] = value
-      config_file.close()
+      else:
+         for line in config_file:
+            # Get rid of \n
+            line = line.rstrip()
+            # Empty?
+            if not line:
+               continue
+            # Comment?
+            if line.startswith("#"):
+               continue
+            (name, value) = line.split("=")
+            name = name.strip()
+            config[name] = value
+         config_file.close()
 
       if os.path.isfile(passthrough_filename) :
          self.log("Warning, file: "+passthrough_filename+" exists; Passthrough mode activated")
@@ -140,6 +111,44 @@ class Proximus:
          config['debug'] = int(config['debug'])
       else :
          config['debug'] = 0
+
+      settings = config
+      #pprint.pprint(settings)  ## debug
+
+
+   # Get settings from db and catch error if no settings are stored
+   def get_settings_from_db(self):
+      global settings
+
+      # Get the fully-qualified name.
+      hostname = socket.gethostname()
+      fqdn_hostname = socket.getfqdn(hostname)
+
+      try:
+         # Get proxy specific settings
+         db_cursor.execute ("SELECT location_id, redirection_host, smtpserver, admin_email, admincc \
+                           FROM proxy_settings \
+                           WHERE fqdn_proxy_hostname = %s", ( fqdn_hostname ))
+         query = db_cursor.fetchone()
+
+         # combine with settings with existing ones
+         settings = dict(settings, **query)
+
+         # Get global settings
+         db_cursor.execute ("SELECT name, value FROM global_settings")
+         query = db_cursor.fetchall()
+         for row in query:
+            settings[row['name']] = row['value']
+      
+      # catch error if no settings are stored;
+      # and activate passthrough mode
+      except :
+         error_msg = "ERROR: please make sure that a config for this node is stored in the database. Table-name: proxy_settings - Full qualified domain name: " + fqdn_hostname
+         self.log("ERROR: activating passthrough-mode until config is present")
+         self.log(error_msg)
+         self._writeline(error_msg)
+         settings['passthrough'] = True
+
 
    def job_testbind(self):
       try:
@@ -169,7 +178,7 @@ class Proximus:
       self.stdout.flush()
 
    def run(self):
-      global config, settings
+      global settings
 
       # note for later
       args = sys.argv[1:]
@@ -180,7 +189,7 @@ class Proximus:
       self.req_id = 0
       line = self._readline()
       while line:
-         if config['passthrough'] == True :
+         if settings['passthrough'] == True :
             self._writeline("")
          else:
             self.req_id += 1
@@ -245,8 +254,8 @@ class Proximus:
 
       filename = settings['vardir'] + filename
       prehash = s.md5_for_file(filename)
-      f = s.open_file(filename, 'w')
 
+      f = s.open_file(filename, 'w')
       db_cursor.execute (query)
       rows = db_cursor.fetchall()
 
@@ -268,8 +277,8 @@ class Proximus:
          s.log("Attention, output of reload command: + " + output )
          return status
       elif meth == "signal" :
-         s.log("Attention, going to send SIGHUB to my parent process: + " + str(os.getppid()) )
-         os.kill(os.getppid(), signal.SIGHUB)
+         s.log("Attention, going to send SIGHUP to my parent process: + " + str(os.getppid()) )
+         os.kill(os.getppid(), signal.SIGHUP)
       else:
          s.log("Attention, not reloading since no valid 'reload_method' is configured in the config: " + meth )
 
