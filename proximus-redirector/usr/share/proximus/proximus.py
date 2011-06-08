@@ -5,6 +5,7 @@ import MySQLdb
 import MySQLdb.cursors
 import os, signal
 import socket
+import struct
 import syslog
 import pprint # for debugging
 
@@ -258,7 +259,6 @@ class Proximus:
 
 
    def update_lists(s):
-      global request, user
       s.reloadNeeded = False
 
       s.debug("Updating lists now", 2)
@@ -341,7 +341,7 @@ class Proximus:
 
    # called when a request has to be learned
    def learn(s):
-      global request, user
+      global request
 
       # check if site has already been learned
       db_cursor.execute ("SELECT id \
@@ -367,7 +367,7 @@ class Proximus:
 
    # checks if a redirect has been logged and writes it into the db if not..
    def redirect_log(s):
-      global request, user
+      global request
 
       db_cursor.execute ("INSERT INTO logs (sitename, ipaddress, user_id, protocol, location_id, source, created, hitcount) \
                            VALUES (%s, %s, %s, %s, %s, %s, NOW(), %s) \
@@ -378,14 +378,11 @@ class Proximus:
 
    # checks if a redirect has been logged and writes it into the db if not..
    def redirect_log_hit(s, id):
-      global request, user
       db_cursor.execute ("UPDATE logs SET hitcount=hitcount+1 WHERE id = %s", (request['id']))
 
 
    # send redirect to the browser
    def redirect_send(s):
-      global request, user
-
       if request['protocol'] == "SSL" :
          # default redirection method - if not further specified
          return "302:http://%s%s/proximus.php?site=%s&id=%s&url=%s" % (settings['redirection_host'], settings['web_path'], request['sitename_save'], request['id'], base64.b64encode("https://"+request['sitename']))
@@ -397,7 +394,7 @@ class Proximus:
 
    # called when a request is redirected
    def redirect(s):
-      global request, user
+      global request
 
       if request['sitename'].startswith(settings['retrain_key']) :
          key = settings['retrain_key']
@@ -478,7 +475,6 @@ class Proximus:
       
 
    def send_mail(s, subject, body):
-      global user
       smtp = smtplib.SMTP(settings['smtpserver'])
       msg = MIMEText(body)
       msg['Subject'] = subject
@@ -492,8 +488,6 @@ class Proximus:
 
 
    def deny_mail_user(s):
-      global user, request
-
       # if user doesn't have an email address skip the part below
       if user['emailaddress'] == "":
          return s.deny()
@@ -601,7 +595,6 @@ class Proximus:
 
    # tests if a ip address is within a subnet
    def addressInNetwork(s, ip, net):
-      import socket,struct
       try:
          ipaddr = int(''.join([ '%02x' % int(x) for x in ip.split('.') ]), 16)
          netstr, bits = net.split('/')
@@ -613,7 +606,7 @@ class Proximus:
 
 
    def check_request(s, line):
-      global request, user
+      global request
 
       if s.parse_line(line) == False:
          return s.deny()
