@@ -85,11 +85,24 @@ class Proximus:
       if not config.has_key("web_path") :
          config['web_path'] = "/proximus"
 
-      # do some converting
+      # sanity checks
+      # debug
       if config.has_key("debug") :
          config['debug'] = int(config['debug'])
       else :
          config['debug'] = 0
+
+      # port
+      if config.has_key("port") :
+         config['port'] = int(config['port'])
+      else :
+         config['port'] = 65432
+
+      # update_interval
+      if config.has_key("list_update_interval") :
+         config['list_update_interval'] = int(config['list_update_interval'])
+      else :
+         config['list_update_interval'] = 60
 
       settings = config
       #pprint.pprint(settings)  ## debug
@@ -168,6 +181,10 @@ class Proximus:
          line = self._readline()
 
    def check_config(self):
+      settings['db_user'] = "***"
+      settings['db_pass'] = "***"
+      pprint.pprint(settings)
+      self._writeline("")
       self.log("Config seems to be ok")
  
    ################
@@ -222,8 +239,9 @@ class Proximus:
 
 
    def job_testbind(self):
+      global settings
       try:
-         self.s.bind(("127.0.0.1", 34563))
+         self.s.bind(("127.0.0.1", settings['port']))
          self.s.listen(1)
 
          # deactivate bindtest job
