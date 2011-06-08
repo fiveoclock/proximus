@@ -691,9 +691,25 @@ class Proximus:
 
 if __name__ == "__main__":
    sr = Proximus()
-   args = sys.argv[1:]
 
-   if len(args) >= 1:
-      print "here be some function call... later..."
+   import argparse
+   parser = argparse.ArgumentParser(description='ProXimus redirector - This program is intended to be integrated into squid, alternatively use the options listed below.')
+   parser.add_argument('-u', '--updatelists', action='store_true', help='Updates noauth lists and exits')
+   parser.add_argument('-c', '--checkconfig', action='store_true', help='Check config and database connection and exit')
+   parser.add_argument('-a', '--auth', action='store_true', help='Run ProXimus in authenticator mode')
+   parser.add_argument('-d', '--debug', action='store', help='Set debbuging level', type=int, default=0, metavar='N')
+
+   args = parser.parse_args()
+   options = vars(args)
+   #pprint.pprint(options)
+
+   if options['updatelists'] :
+      sr.update_lists()
+   elif options['auth'] :
+      print "Sorry, this is not implemented yet"
+   elif options['checkconfig'] :
+      print "Sorry, this is not implemented yet"
    else:
       sr.run()
+
+
