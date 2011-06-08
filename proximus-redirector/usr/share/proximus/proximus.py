@@ -27,7 +27,7 @@ request = {'sitename':None, 'sitename_save':None, 'protocol':None, 'siteport':No
 user = {'ident':None, 'id':None, 'username':None, 'location_id':None, 'group_id':None, 'emailaddress':None }
 
 class Proximus:
-   def __init__(self):
+   def __init__(self, options):
       global db_cursor, settings
 
       # configure syslog
@@ -35,31 +35,19 @@ class Proximus:
       self.stdin   = sys.stdin
       self.stdout  = sys.stdout
 
+      # set options
+      settings = options
       # read config file and connect to the database
       self.read_configfile()
+      # combine / overwrite settings with passed options again... - kind of stupid..
+      settings = dict(settings, **options)
+
       self.db_connect()
       self.get_settings_from_db()
 
       # debugging....
       #pprint.pprint(settings)  ## debug
-      self.debug("Settings: " + pprint.pformat(settings, 3), 1 )
-
-   def db_connect(self):
-      global db_cursor, settings
-
-      try:
-         conn = MySQLdb.connect (host = settings['db_host'],
-            user = settings['db_user'],
-            passwd = settings['db_pass'],
-            db = settings['db_name'], cursorclass=MySQLdb.cursors.DictCursor)
-         db_cursor = conn.cursor ()
-      except MySQLdb.Error, e:
-         error_msg = "ERROR: please make sure that database settings are correctly set in " + config_filename
-         self.log("ERROR: activating passthrough-mode until config is present")
-         settings['passthrough'] = True
-
-         self.log(error_msg)
-         self._writeline(error_msg)
+      self.debug("Settings: " + pprint.pformat(settings, 3), 3 )
 
    def read_configfile(self):
       global settings
@@ -105,6 +93,24 @@ class Proximus:
 
       settings = config
       #pprint.pprint(settings)  ## debug
+
+
+   def db_connect(self):
+      global db_cursor, settings
+
+      try:
+         conn = MySQLdb.connect (host = settings['db_host'],
+            user = settings['db_user'],
+            passwd = settings['db_pass'],
+            db = settings['db_name'], cursorclass=MySQLdb.cursors.DictCursor)
+         db_cursor = conn.cursor ()
+      except MySQLdb.Error, e:
+         error_msg = "ERROR: please make sure that database settings are correctly set in " + config_filename
+         self.log("ERROR: activating passthrough-mode until config is present")
+         settings['passthrough'] = True
+
+         self.log(error_msg)
+         self._writeline(error_msg)
 
 
    # Get settings from db and catch error if no settings are stored
@@ -161,7 +167,9 @@ class Proximus:
             self.debug("Resp " + str(self.req_id) + ": " + response, 1)
          line = self._readline()
 
-
+   def check_config(self):
+      self.log("Config seems to be ok")
+ 
    ################
    ################
    ## Basic functions
@@ -178,6 +186,8 @@ class Proximus:
 
    def log(s, str):
       syslog.syslog(syslog.LOG_DEBUG,str)
+      if settings['interactive']:
+         s._writeline(str)
 
    def debug(s, str, level=1):
       global settings
@@ -249,6 +259,8 @@ class Proximus:
       if s.reloadNeeded == True:
          s.debug("Lists have changed Squid reload needed", 1)
          s.reload_parent()
+      else:
+         s.debug("Lists unchanged, no reload needed", 2)
 
 
    def update_file(s, filename, query):
@@ -690,26 +702,32 @@ class Proximus:
 
 
 if __name__ == "__main__":
-   sr = Proximus()
-
    import argparse
    parser = argparse.ArgumentParser(description='ProXimus redirector - This program is intended to be integrated into squid, alternatively use the options listed below.')
    parser.add_argument('-u', '--updatelists', action='store_true', help='Updates noauth lists and exits')
    parser.add_argument('-c', '--checkconfig', action='store_true', help='Check config and database connection and exit')
    parser.add_argument('-a', '--auth', action='store_true', help='Run ProXimus in authenticator mode')
    parser.add_argument('-d', '--debug', action='store', help='Set debbuging level', type=int, default=0, metavar='N')
+   parser.add_argument('-i', '--interactive', action='store_true', help='Write everything to stdout; only for testing')
 
    args = parser.parse_args()
    options = vars(args)
    #pprint.pprint(options)
 
    if options['updatelists'] :
+      options['debug'] = 2
+      options['interactive'] = True
+      sr = Proximus(options)
       sr.update_lists()
    elif options['auth'] :
       print "Sorry, this is not implemented yet"
    elif options['checkconfig'] :
-      print "Sorry, this is not implemented yet"
+      options['debug'] = 2
+      options['interactive'] = True
+      sr = Proximus(options)
+      sr.check_config()
    else:
+      sr = Proximus(options)
       sr.run()
 
 
