@@ -18,13 +18,15 @@ from apscheduler.scheduler import Scheduler
 import hashlib
 import commands
 
-config_filename = "/etc/proximus/proximus.conf"
-passthrough_filename = "/etc/proximus/passthrough"
 
 # define globaly used variables
 settings = {}
 request = {'sitename':None, 'sitename_save':None, 'protocol':None, 'siteport':None, 'src_address':None, 'url':None, 'redirection_method':None, 'id':None }
 user = {'ident':None, 'id':None, 'username':None, 'location_id':None, 'group_id':None, 'emailaddress':None }
+
+config_filename = "/etc/proximus/proximus.conf"
+passthrough_filename = "/etc/proximus/passthrough"
+
 
 class Proximus:
    def __init__(self, options):
@@ -109,7 +111,7 @@ class Proximus:
 
 
    def db_connect(self):
-      global db_cursor, settings
+      global db_cursor
 
       try:
          conn = MySQLdb.connect (host = settings['db_host'],
@@ -160,8 +162,6 @@ class Proximus:
          settings['passthrough'] = True
 
    def run(self):
-      global settings
-
       # start list updating thread if configured
       if settings['reload_method'] in ["signal", "command"] :
          self.start_list_update_thread()
@@ -207,7 +207,6 @@ class Proximus:
          s._writeline(str)
 
    def debug(s, str, level=1):
-      global settings
       if settings['debug'] >= level:
          s.log(str)
 
@@ -239,7 +238,6 @@ class Proximus:
 
 
    def job_testbind(self):
-      global settings
       try:
          self.s.bind(("127.0.0.1", settings['port']))
          self.s.listen(1)
@@ -260,7 +258,7 @@ class Proximus:
 
 
    def update_lists(s):
-      global db_cursor, settings, request, user
+      global request, user
       s.reloadNeeded = False
 
       s.debug("Updating lists now", 2)
@@ -282,8 +280,6 @@ class Proximus:
 
 
    def update_file(s, filename, query):
-      global db_cursor, settings
-
       filename = settings['vardir'] + filename
       prehash = s.md5_for_file(filename)
 
@@ -345,7 +341,7 @@ class Proximus:
 
    # called when a request has to be learned
    def learn(s):
-      global db_cursor, settings, request, user
+      global request, user
 
       # check if site has already been learned
       db_cursor.execute ("SELECT id \
@@ -371,7 +367,7 @@ class Proximus:
 
    # checks if a redirect has been logged and writes it into the db if not..
    def redirect_log(s):
-      global db_cursor, settings, request, user
+      global request, user
 
       db_cursor.execute ("INSERT INTO logs (sitename, ipaddress, user_id, protocol, location_id, source, created, hitcount) \
                            VALUES (%s, %s, %s, %s, %s, %s, NOW(), %s) \
@@ -382,13 +378,13 @@ class Proximus:
 
    # checks if a redirect has been logged and writes it into the db if not..
    def redirect_log_hit(s, id):
-      global db_cursor, settings, request, user
+      global request, user
       db_cursor.execute ("UPDATE logs SET hitcount=hitcount+1 WHERE id = %s", (request['id']))
 
 
    # send redirect to the browser
    def redirect_send(s):
-      global db_cursor, settings, request, user
+      global request, user
 
       if request['protocol'] == "SSL" :
          # default redirection method - if not further specified
@@ -401,7 +397,7 @@ class Proximus:
 
    # called when a request is redirected
    def redirect(s):
-      global db_cursor, settings, request, user
+      global request, user
 
       if request['sitename'].startswith(settings['retrain_key']) :
          key = settings['retrain_key']
@@ -482,7 +478,7 @@ class Proximus:
       
 
    def send_mail(s, subject, body):
-      global settings, user
+      global user
       smtp = smtplib.SMTP(settings['smtpserver'])
       msg = MIMEText(body)
       msg['Subject'] = subject
@@ -496,7 +492,7 @@ class Proximus:
 
 
    def deny_mail_user(s):
-      global db_curor, settings, user, request
+      global user, request
 
       # if user doesn't have an email address skip the part below
       if user['emailaddress'] == "":
@@ -578,7 +574,7 @@ class Proximus:
 
 
    def fetch_userinfo(s, ident):
-      global db_cursor, settings, user
+      global user
 
       if ident != "-" :
          # get user
@@ -617,7 +613,7 @@ class Proximus:
 
 
    def check_request(s, line):
-      global db_cursor, settings, request, user
+      global request, user
 
       if s.parse_line(line) == False:
          return s.deny()
