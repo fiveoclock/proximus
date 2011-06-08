@@ -246,7 +246,7 @@ class Proximus:
          # deactivate bindtest job
          self.sched.unschedule_job(self.job_bind)
          # Schedule job_function to be called every two hours
-         self.sched.add_interval_job(self.job_update, seconds=5)
+         self.sched.add_interval_job(self.job_update, seconds = settings['list_update_interval'] )
          # remove the previous scheduled job
          self.log("I'm now the master process!")
       except socket.error, e:
@@ -720,6 +720,10 @@ if __name__ == "__main__":
    args = parser.parse_args()
    options = vars(args)
    #pprint.pprint(options)
+
+   # delete debug option if it was not set
+   if not options['debug'] :
+      del options['debug']
 
    if options['updatelists'] :
       options['debug'] = 2
