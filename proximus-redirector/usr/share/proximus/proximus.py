@@ -82,8 +82,7 @@ class Proximus:
 
       # debugging....
       #pprint.pprint(settings)  ## debug
-      if config['debug'] > 0 :
-         self.log("Settings: " + pprint.pformat(settings, 3) )
+      self.debug("Settings: " + pprint.pformat(settings, 3), 1 )
 
    def db_connect(self):
       global db_cursor, config
@@ -185,16 +184,11 @@ class Proximus:
             self._writeline("")
          else:
             self.req_id += 1
-            if config['debug'] > 0 :
-               self.log("Req  " + str(self.req_id) + ": " + line)
+            self.debug("Req  " + str(self.req_id) + ": " + line, 1)
             response = self.check_request(line)
             self._writeline(response)
-            if config['debug'] > 0 :
-               self.log("Resp " + str(self.req_id) + ": " + response)
+            self.debug("Resp " + str(self.req_id) + ": " + response, 1)
          line = self._readline()
-
-   def log(s, str):
-      syslog.syslog(syslog.LOG_DEBUG,str)
 
 
 
@@ -203,6 +197,14 @@ class Proximus:
    ## Basic functions
    ########
    ########
+
+   def log(s, str):
+      syslog.syslog(syslog.LOG_DEBUG,str)
+
+   def debug(s, str, level=1):
+      global settings
+      if settings['debug'] >= level:
+         s.log(str)
 
    def open_file(s, filename, option):
       try:
@@ -223,8 +225,7 @@ class Proximus:
       global db_cursor, settings, request, user
       s.reloadNeeded = False
 
-      if config['debug'] > 0:
-         s.log("Updating lists now")
+      s.debug("Updating lists now", 1)
 
       sql = "SELECT sitename, description \
             FROM noauth_rules \
@@ -258,8 +259,8 @@ class Proximus:
 
 
    def reload_parent(s):
-      cmd = config['reload_command']
-      meth = config['reload_method']
+      cmd = settings['reload_command']
+      meth = settings['reload_method']
 
       if ( meth == "command" ) and ( cmd ) :
          s.log("Attention, going to reload squid now, using: + " + cmd )
@@ -386,8 +387,7 @@ class Proximus:
                         ", (user['id'], request['protocol'], "REDIRECT", request['sitename'], request['sitename']))
       dyn = db_cursor.fetchone()
       if (dyn != None) :   # user is allowed to access this site
-         if settings['debug'] >= 2 :
-            s.log("Req  "+ str(s.req_id) +": REDIRECT; Log found; " + pprint.pformat(dyn) )
+         s.debug("Req  "+ str(s.req_id) +": REDIRECT; Log found; " + pprint.pformat(dyn), 2 )
          request['id'] = dyn['id']
          s.redirect_log_hit(request['id'])
          return s.grant()
@@ -415,8 +415,7 @@ class Proximus:
          for row1 in rows1:
             for row2 in rows2:
                if row1['sitename'] == row2['sitename'] :
-                  if settings['debug'] >= 2 :
-                     s.log("Debug REDIRECT; Log found with subsite sharing - own_parents; Log-id="+str(rows1['id']))
+                  s.debug("Debug REDIRECT; Log found with subsite sharing - own_parents; Log-id="+str(rows1['id']), 2)
                   return s.grant()
       elif settings['subsite_sharing'] == "all_parents" :  # check if someone else has already added this site as a children 
          db_cursor.execute ("SELECT sitename, id \
@@ -430,13 +429,11 @@ class Proximus:
                            ", ("REDIRECT", request['sitename'], request['sitename']))
          all = db_cursor.fetchone()
          if (all != None) :
-            if settings['debug'] >= 2 :
-               s.log("Debug REDIRECT; Log found with subsite sharing - all_parents; Log-id="+str(all['id']))
+            s.debug("Debug REDIRECT; Log found with subsite sharing - all_parents; Log-id="+str(all['id']), 2)
             return s.grant()
 
       # if we get here user is not yet allowed to access this site
-      if settings['debug'] >= 2 :
-         s.log("Debug REDIRECT; No log found; DENY")
+      s.debug("Debug REDIRECT; No log found; DENY", 2)
       # log request
       s.redirect_log()
       return s.redirect_send()
@@ -553,11 +550,10 @@ class Proximus:
          user = None
 
       #pprint.pprint(user)   ## debug
-      if settings['debug'] >= 2 :
-         if user != None :
-            s.log("Req  "+ str(s.req_id) +": User found; " + pprint.pformat(user) )
-         else :
-            s.log("Req  "+ str(s.req_id) +": No user found; ident="+ident)
+      if user != None :
+         s.debug("Req  "+ str(s.req_id) +": User found; " + pprint.pformat(user) , 2)
+      else :
+         s.debug("Req  "+ str(s.req_id) +": No user found; ident="+ident, 2)
     
       # make all vars lowercase to make sure they match
       #sitename = escape(sitename)
@@ -613,8 +609,7 @@ class Proximus:
       if user == None :
          # since squid is configured to require user auth
          # and no user identification is sent the site must be in the no-auth table
-         if settings['debug'] >= 2 :
-            s.log("Req  "+ str(s.req_id) +": ALLOW - Request with no user-id - looks like a NoAuth rule ;-)")
+         s.debug("Req  "+ str(s.req_id) +": ALLOW - Request with no user-id - looks like a NoAuth rule ;-)", 2)
          return s.grant()
       #else :
          # actually this should not be nessecary - the browser should never
@@ -661,8 +656,7 @@ class Proximus:
                   (user['group_id'], user['location_id'], request['sitename'], request['sitename'], request['protocol']))
       rules = db_cursor.fetchall()
       for rule in rules:
-         if settings['debug'] >= 2 :
-            s.log("Req  "+ str(s.req_id) +": Rule found; " + pprint.pformat(rule))
+         s.debug("Req  "+ str(s.req_id) +": Rule found; " + pprint.pformat(rule), 2)
          if rule['policy'] == "ALLOW" :
             return s.grant()
          elif rule['policy'].startswith("REDIRECT") :
@@ -676,8 +670,7 @@ class Proximus:
             s.learn()
             return s.grant()
 
-      if settings['debug'] >= 2 :
-         s.log("Req  "+ str(s.req_id) +": no rule found; using default deny")
+      s.debug("Req  "+ str(s.req_id) +": no rule found; using default deny", 2)
 
       # deny access if the request was not accepted until this point ;-)
       return s.deny()
