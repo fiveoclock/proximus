@@ -16,6 +16,7 @@ from email.MIMEText import MIMEText
 
 from apscheduler.scheduler import Scheduler
 import hashlib
+import commands
 
 config_filename = "/etc/proximus/proximus.conf"
 passthrough_filename = "/etc/proximus/passthrough"
@@ -38,16 +39,6 @@ class Proximus:
       self.read_configfile()
       self.db_connect()
       self.get_settings_from_db()
-
-      # prepare socket
-      self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-      self.s.setblocking(False)
-
-      # Start the scheduler
-      self.sched = Scheduler()
-      self.sched.start()
-      # Schedule job_function to be called
-      self.job_bind = self.sched.add_interval_job(self.job_testbind, seconds=5)
 
       # debugging....
       #pprint.pprint(settings)  ## debug
@@ -149,6 +140,76 @@ class Proximus:
          self._writeline(error_msg)
          settings['passthrough'] = True
 
+   def run(self):
+      global settings
+
+      # start list updating thread if configured
+      if settings['reload_method'] in ["signal", "command"] :
+         self.start_list_update_thread()
+
+      self.log("started")
+      self.req_id = 0
+      line = self._readline()
+      while line:
+         if settings['passthrough'] == True :
+            self._writeline("")
+         else:
+            self.req_id += 1
+            self.debug("Req  " + str(self.req_id) + ": " + line, 1)
+            response = self.check_request(line)
+            self._writeline(response)
+            self.debug("Resp " + str(self.req_id) + ": " + response, 1)
+         line = self._readline()
+
+
+   ################
+   ################
+   ## Basic functions
+   ########
+   ########
+
+   def _readline(self):
+      "Returns one unbuffered line from squid."
+      return self.stdin.readline()[:-1]
+
+   def _writeline(self,s):
+      self.stdout.write(s+'\n')
+      self.stdout.flush()
+
+   def log(s, str):
+      syslog.syslog(syslog.LOG_DEBUG,str)
+
+   def debug(s, str, level=1):
+      global settings
+      if settings['debug'] >= level:
+         s.log(str)
+
+   def open_file(s, filename, option):
+      try:
+         f = open(filename, option)
+         return f
+      except :
+         error_msg = "ERROR: cannot open file: " + filename
+         s.log(error_msg)
+
+
+   ################
+   ################
+   ## updating of files
+   ########
+   ########
+
+   def start_list_update_thread(self):
+      # prepare socket
+      self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+      self.s.setblocking(False)
+
+      # Start the scheduler
+      self.sched = Scheduler()
+      self.sched.start()
+      # Schedule job_function to be called
+      self.job_bind = self.sched.add_interval_job(self.job_testbind, seconds=5)
+
 
    def job_testbind(self):
       try:
@@ -169,72 +230,12 @@ class Proximus:
       #self.log("running.......")
       self.update_lists()
 
-   def _readline(self):
-      "Returns one unbuffered line from squid."
-      return self.stdin.readline()[:-1]
-
-   def _writeline(self,s):
-      self.stdout.write(s+'\n')
-      self.stdout.flush()
-
-   def run(self):
-      global settings
-
-      # note for later
-      args = sys.argv[1:]
-      if len(args) >= 1:
-         print "here be some function call... later..."
-
-      self.log("started")
-      self.req_id = 0
-      line = self._readline()
-      while line:
-         if settings['passthrough'] == True :
-            self._writeline("")
-         else:
-            self.req_id += 1
-            self.debug("Req  " + str(self.req_id) + ": " + line, 1)
-            response = self.check_request(line)
-            self._writeline(response)
-            self.debug("Resp " + str(self.req_id) + ": " + response, 1)
-         line = self._readline()
-
-
-
-   ################
-   ################
-   ## Basic functions
-   ########
-   ########
-
-   def log(s, str):
-      syslog.syslog(syslog.LOG_DEBUG,str)
-
-   def debug(s, str, level=1):
-      global settings
-      if settings['debug'] >= level:
-         s.log(str)
-
-   def open_file(s, filename, option):
-      try:
-         f = open(filename, option)
-      except :
-         error_msg = "ERROR: cannot open file: " + filename
-         s.log(error_msg)
-      return f
-
-
-   ################
-   ################
-   ## updating of files
-   ########
-   ########
 
    def update_lists(s):
       global db_cursor, settings, request, user
       s.reloadNeeded = False
 
-      s.debug("Updating lists now", 1)
+      s.debug("Updating lists now", 2)
 
       sql = "SELECT sitename, description \
             FROM noauth_rules \
@@ -242,10 +243,11 @@ class Proximus:
                AND (location_id = %s OR location_id = 1 OR location_id IS NULL) \
                AND (valid_until IS NULL OR valid_until > NOW())" 
 
-      s.update_file("testip", sql % ('IP', settings['location_id']) )
-      s.update_file("testdn", sql % ('DN', settings['location_id']) )
+      s.update_file("noauth_dst_ip", sql % ('IP', settings['location_id']) )
+      s.update_file("noauth_dst_dn", sql % ('DN', settings['location_id']) )
 
       if s.reloadNeeded == True:
+         s.debug("Lists have changed Squid reload needed", 1)
          s.reload_parent()
 
 
@@ -274,7 +276,7 @@ class Proximus:
       if ( meth == "command" ) and ( cmd ) :
          s.log("Attention, going to reload squid now, using: + " + cmd )
          status, output = commands.getstatusoutput( cmd )
-         s.log("Attention, output of reload command: + " + output )
+         s.log("Attention, output of reload command: " + output )
          return status
       elif meth == "signal" :
          s.log("Attention, going to send SIGHUP to my parent process: + " + str(os.getppid()) )
@@ -287,13 +289,14 @@ class Proximus:
       md5 = hashlib.md5()
 
       f = s.open_file(filename, 'r')
-      while True:
-         data = f.read(block_size)
-         if not data:
-            break
-         md5.update(data)
-      f.close()
-      return md5.digest()
+      if f :
+         while True:
+            data = f.read(block_size)
+            if not data:
+               break
+            md5.update(data)
+         f.close()
+         return md5.digest()
 
 
    ################
@@ -688,5 +691,9 @@ class Proximus:
 
 if __name__ == "__main__":
    sr = Proximus()
-   sr.run()
+   args = sys.argv[1:]
 
+   if len(args) >= 1:
+      print "here be some function call... later..."
+   else:
+      sr.run()
