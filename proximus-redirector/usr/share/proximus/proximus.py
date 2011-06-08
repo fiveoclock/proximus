@@ -221,18 +221,16 @@ class Proximus:
 
    def update_lists(s):
       global db_cursor, settings, request, user
-      s.log("Updating lists now")
-
       s.reloadNeeded = False
+
+      if config['debug'] > 0:
+         s.log("Updating lists now")
 
       sql = "SELECT sitename, description \
             FROM noauth_rules \
             WHERE type='%s' \
                AND (location_id = %s OR location_id = 1 OR location_id IS NULL) \
                AND (valid_until IS NULL OR valid_until > NOW())" 
-
-      print(sql % ('IP', settings['location_id']) )
-      print(sql % ('DN', settings['location_id']) )
 
       s.update_file("testip", sql % ('IP', settings['location_id']) )
       s.update_file("testdn", sql % ('DN', settings['location_id']) )
@@ -255,13 +253,24 @@ class Proximus:
          f.write(row['sitename'] + "\n")
       f.close()
 
-      if prehash == s.md5_for_file(filename):
+      if prehash != s.md5_for_file(filename):
          s.reloadNeeded = True
 
 
    def reload_parent(s):
-      s.log("Attention, going to send SIGHUB to my parent process: + " + str(os.getppid()) )
-      #os.kill(os.getppid(), signal.SIGHUB)
+      cmd = config['reload_command']
+      meth = config['reload_method']
+
+      if ( meth == "command" ) and ( cmd ) :
+         s.log("Attention, going to reload squid now, using: + " + cmd )
+         status, output = commands.getstatusoutput( cmd )
+         s.log("Attention, output of reload command: + " + output )
+         return status
+      elif meth == "signal" :
+         s.log("Attention, going to send SIGHUB to my parent process: + " + str(os.getppid()) )
+         os.kill(os.getppid(), signal.SIGHUB)
+      else:
+         s.log("Attention, not reloading since no valid 'reload_method' is configured in the config: " + meth )
 
 
    def md5_for_file(s, filename, block_size=2**20):
