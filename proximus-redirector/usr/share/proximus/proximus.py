@@ -219,6 +219,22 @@ class Proximus:
          error_msg = "ERROR: cannot open file: " + filename
          s.log(error_msg)
 
+   def read_file(s, filename):
+      f = s.open_file(filename, 'r')
+      if f != None :
+         data = f.read()
+         f.close()
+         return data
+
+   def write_file(s, filename, data):
+      f = s.open_file(filename, 'w')
+      if f != None :
+         f.write( data )
+         f.close()
+         return True
+      else:
+         return False
+
 
    ################
    ################
@@ -280,18 +296,24 @@ class Proximus:
 
 
    def update_file(s, filename, query):
-      filename = settings['vardir'] + filename
-      prehash = s.md5_for_file(filename)
-
-      f = s.open_file(filename, 'w')
-      db_cursor.execute (query)
+      # make query
+      db_cursor.execute(query)
       rows = db_cursor.fetchall()
 
+      data = ""
       for row in rows:
-         f.write(row['sitename'] + "\n")
-      f.close()
+         data += row['sitename'] + "\n"
 
-      if prehash != s.md5_for_file(filename):
+      # get hashes
+      filename = settings['vardir'] + filename
+      prehash = s.get_md5( s.read_file(filename) )
+      curhash = s.get_md5( data )
+      #print prehash
+      #print curhash
+
+      # compare hashes and reload if needed
+      if curhash != prehash :
+         s.write_file( filename, data )
          s.reloadNeeded = True
 
 
@@ -311,17 +333,10 @@ class Proximus:
          s.log("Attention, not reloading since no valid 'reload_method' is configured in the config: " + meth )
 
 
-   def md5_for_file(s, filename, block_size=2**20):
+   def get_md5(s, str):
       md5 = hashlib.md5()
-
-      f = s.open_file(filename, 'r')
-      if f :
-         while True:
-            data = f.read(block_size)
-            if not data:
-               break
-            md5.update(data)
-         f.close()
+      if str != None:
+         md5.update( str )
          return md5.digest()
 
 
