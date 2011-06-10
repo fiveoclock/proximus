@@ -181,6 +181,20 @@ class Proximus:
             self.debug("Resp " + str(self.req_id) + ": " + response, 1)
          line = self._readline()
 
+
+   def run_auth(self):
+      self.log("authenticator started")
+      self.req_id = 0
+      line = self._readline()
+      while line:
+         if settings['passthrough'] == True :
+            self._writeline("")
+         else:
+            self.req_id += 1
+            self._writeline( self.check_auth(line) )
+         line = self._readline()
+
+
    def check_config(self):
       settings['db_user'] = "***"
       settings['db_pass'] = "***"
@@ -338,6 +352,47 @@ class Proximus:
       if str != None:
          md5.update( str )
          return md5.digest()
+
+
+   ################
+   ################
+   ## User authentication
+   ########
+   ########
+
+   def check_auth(s, line):
+      creds = string.split(line)
+      if len(creds) < 2:
+         s.debug("Auth failed; input has wrong format; should be 'username password'", 2)
+         return s.auth_deny()
+      else :
+         username = creds[0]
+         password = creds[1]
+
+         salt = settings['auth_salt']
+         s.fetch_userinfo(username)
+         pwhash = s.get_sha1(password, salt)
+         if user and ( user['password'] == pwhash ):
+            s.debug("Auth OK; user: %s" % username, 3)
+            return s.auth_grant()
+         else :
+            s.debug("Auth failed; user: %s" % username, 2)
+            return s.auth_deny()
+
+   def auth_grant(s):
+      return "OK"
+
+   def auth_deny(s):
+      return "ERR"
+
+   def get_sha1(s, str, salt=""):
+      sha1 = hashlib.sha1()
+      if str != None:
+         if salt != "":
+            sha1.update( salt + str )
+            return sha1.hexdigest()
+         sha1.update( str )
+         return sha1.hexdigest()
 
 
    ################
@@ -588,7 +643,7 @@ class Proximus:
       if ident != "-" :
          # get user
          try:
-            db_cursor.execute ("SELECT id, username, location_id, emailaddress, group_id FROM users WHERE username = %s AND active = 'Y'", ident)
+            db_cursor.execute ("SELECT id, username, password, location_id, emailaddress, group_id FROM users WHERE username = %s AND active = 'Y'", ident)
             user = db_cursor.fetchone()
             user['emailaddress'] = user['emailaddress'].rstrip('\n')
          except TypeError:
@@ -598,7 +653,7 @@ class Proximus:
 
       #pprint.pprint(user)   ## debug
       if user != None :
-         s.debug("Req  "+ str(s.req_id) +": User found; " + pprint.pformat(user) , 2)
+         s.debug("Req  "+ str(s.req_id) +": User found; " + pprint.pformat(user) , 3)
       else :
          s.debug("Req  "+ str(s.req_id) +": No user found; ident="+ident, 2)
     
@@ -746,7 +801,8 @@ if __name__ == "__main__":
       sr = Proximus(options)
       sr.update_lists()
    elif options['auth'] :
-      print "Sorry, this is not implemented yet"
+      sr = Proximus(options)
+      sr.run_auth()
    elif options['checkconfig'] :
       options['debug'] = 2
       options['interactive'] = True
