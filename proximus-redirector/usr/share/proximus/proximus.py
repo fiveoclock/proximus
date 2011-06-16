@@ -167,7 +167,7 @@ class Proximus:
       if settings['reload_method'] in ["signal", "command"] :
          self.start_list_update_thread()
 
-      self.log("started")
+      self.log("redirector started")
       self.req_id = 0
       line = self._readline()
       while line:
@@ -186,7 +186,7 @@ class Proximus:
       self.log("authenticator started")
       self.req_id = 0
       line = self._readline()
-      while line:
+      while True:
          if settings['passthrough'] == True :
             self._writeline("")
          else:
