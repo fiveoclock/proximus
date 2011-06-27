@@ -52,6 +52,15 @@ class Proximus:
       #pprint.pprint(settings)  ## debug
       self.debug("Settings: " + pprint.pformat(settings, 3), 3 )
 
+      # set timezone according to settings
+      if settings['timezone'] != None:
+         db_cursor.execute ("SET time_zone = %s", ( settings['timezone']) )
+         db_cursor.execute ("SELECT CURTIME() AS now")
+         time = db_cursor.fetchone()
+         self.debug("Timezone was set to: " + settings['timezone'] + "; current time is now: " + str(time['now']), 0)
+      else:
+         self.debug("Current time is now: " + str(time['now']), 0)
+
    def read_configfile(self):
       global settings
 
@@ -84,10 +93,6 @@ class Proximus:
       else :
          config['passthrough'] = False
 
-      # set defaults
-      if not config.has_key("web_path") :
-         config['web_path'] = "/proximus"
-
       # sanity checks
       # debug
       if config.has_key("debug") :
@@ -112,7 +117,7 @@ class Proximus:
 
 
    def db_connect(self):
-      global db_cursor
+      global db_cursor, conn
 
       try:
          conn = MySQLdb.connect (host = settings['db_host'],
@@ -139,7 +144,7 @@ class Proximus:
 
       try:
          # Get proxy specific settings
-         db_cursor.execute ("SELECT location_id, redirection_host, smtpserver, admin_email, admincc \
+         db_cursor.execute ("SELECT location_id, redirection_host, redirection_path, smtpserver, admin_email, admincc, timezone \
                            FROM proxy_settings \
                            WHERE fqdn_proxy_hostname = %s", ( fqdn_hostname ))
          query = db_cursor.fetchone()
@@ -171,6 +176,7 @@ class Proximus:
       self.req_id = 0
       line = self._readline()
       while line:
+         conn.ping(); # reconnect db if gone - find a better place for this
          if settings['passthrough'] == True :
             self._writeline("")
          else:
@@ -403,7 +409,7 @@ class Proximus:
 
    # called when a site is blocked
    def deny(s):
-      return "302:http://%s%s/forbidden.html" % ( settings['redirection_host'], settings['web_path'] )
+      return "302:http://%s%s/forbidden.php" % ( settings['redirection_host'], settings['redirection_path'] )
 
    # called when access to a site is granted
    def grant(s):
@@ -455,11 +461,11 @@ class Proximus:
    def redirect_send(s):
       if request['protocol'] == "SSL" :
          # default redirection method - if not further specified
-         return "302:http://%s%s/proximus.php?site=%s&id=%s&url=%s" % (settings['redirection_host'], settings['web_path'], request['sitename_save'], request['id'], base64.b64encode("https://"+request['sitename']))
+         return "302:http://%s%s/proximus.php?site=%s&id=%s&url=%s" % (settings['redirection_host'], settings['redirection_path'], request['sitename_save'], request['id'], base64.b64encode("https://"+request['sitename']))
 
       else:
          # its http
-         return "302:http://%s%s/proximus.php?site=%s&id=%s&url=%s" % (settings['redirection_host'], settings['web_path'], request['sitename_save'], request['id'], base64.b64encode(request['url']))
+         return "302:http://%s%s/proximus.php?site=%s&id=%s&url=%s" % (settings['redirection_host'], settings['redirection_path'], request['sitename_save'], request['id'], base64.b64encode(request['url']))
 
 
    # called when a request is redirected
