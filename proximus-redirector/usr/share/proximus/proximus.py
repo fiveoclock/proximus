@@ -19,6 +19,8 @@ from apscheduler.scheduler import Scheduler
 import hashlib
 import commands
 
+import ConfigParser
+
 
 # define globaly used variables
 settings = {}
@@ -64,28 +66,16 @@ class Proximus:
    def read_configfile(self):
       global settings
 
-      config = {}
-      config_file = self.open_file(config_filename, 'r')
+      cp = ConfigParser.RawConfigParser()
+      cp.read( config_filename )
 
-      if config_file == None:
+      try:
+         config = dict(cp.items('main'))
+      except MySQLdb.Error, e:
          error_msg = "ERROR: config file not found: " + config_filename
          self.log(error_msg)
          self._writeline(error_msg)
          sys.exit(1)
-      else:
-         for line in config_file:
-            # Get rid of \n
-            line = line.rstrip()
-            # Empty?
-            if not line:
-               continue
-            # Comment?
-            if line.startswith("#"):
-               continue
-            (name, value) = line.split("=")
-            name = name.strip()
-            config[name] = value
-         config_file.close()
 
       if os.path.isfile(passthrough_filename) :
          self.log("Warning, file: "+passthrough_filename+" exists; Passthrough mode activated")
