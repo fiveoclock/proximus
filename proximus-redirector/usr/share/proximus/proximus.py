@@ -88,7 +88,7 @@ class Proximus:
       if config.has_key("debug") :
          config['debug'] = int(config['debug'])
       else :
-         config['debug'] = 0
+         config['debug'] = 1
 
       # port
       if config.has_key("port") :
