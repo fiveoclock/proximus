@@ -54,8 +54,8 @@ class Proximus:
 
       # set timezone according to settings
       if settings['timezone'] != None:
-         db_cursor.execute ("SET time_zone = %s", ( settings['timezone']) )
-         db_cursor.execute ("SELECT CURTIME() AS now")
+         self.db_query ("SET time_zone = %s", ( settings['timezone']) )
+         self.db_query ("SELECT CURTIME() AS now")
          time = db_cursor.fetchone()
          self.debug("Timezone was set to: " + settings['timezone'] + "; current time is now: " + str(time['now']), 0)
       else:
@@ -129,9 +129,18 @@ class Proximus:
          error_msg = "ERROR: please make sure that database settings are correctly set in " + config_filename
          self.log("ERROR: activating passthrough-mode until config is present")
          settings['passthrough'] = True
-
          self.log(error_msg)
          self._writeline(error_msg)
+
+
+   # wrapper to catch mysql disconnections
+   def db_query(self, sql, args=None):
+      try:
+         db_cursor.execute(sql, args)
+      except (AttributeError, MySQLdb.OperationalError):
+         self.db_connect()
+         db_cursor.execute(sql, args)
+      return db_cursor
 
 
    # Get settings from db and catch error if no settings are stored
@@ -144,7 +153,7 @@ class Proximus:
 
       try:
          # Get proxy specific settings
-         db_cursor.execute ("SELECT location_id, redirection_host, redirection_path, smtpserver, admin_email, admincc, timezone \
+         self.db_query("SELECT location_id, redirection_host, redirection_path, smtpserver, admin_email, admincc, timezone \
                            FROM proxy_settings \
                            WHERE fqdn_proxy_hostname = %s", ( fqdn_hostname ))
          query = db_cursor.fetchone()
@@ -153,7 +162,7 @@ class Proximus:
          settings = dict(settings, **query)
 
          # Get global settings
-         db_cursor.execute ("SELECT name, value FROM global_settings")
+         self.db_query ("SELECT name, value FROM global_settings")
          query = db_cursor.fetchall()
          for row in query:
             settings[row['name']] = row['value']
@@ -176,7 +185,6 @@ class Proximus:
       self.req_id = 0
       line = self._readline()
       while line:
-         conn.ping(); # reconnect db if gone - find a better place for this
          if settings['passthrough'] == True :
             self._writeline("")
          else:
@@ -317,7 +325,7 @@ class Proximus:
 
    def update_file(s, filename, query):
       # make query
-      db_cursor.execute(query)
+      s.db_query(query)
       rows = db_cursor.fetchall()
 
       data = ""
@@ -420,7 +428,7 @@ class Proximus:
       global request
 
       # check if site has already been learned
-      db_cursor.execute ("SELECT id \
+      s.db_query ("SELECT id \
                         FROM logs \
                         WHERE \
                            user_id = %s \
@@ -432,12 +440,12 @@ class Proximus:
                         ", (user['id'], request['protocol'], "REDIRECT", request['sitename'], request['sitename']))
       dyn = db_cursor.fetchone()
       if (dyn == None) :
-         db_cursor.execute ("INSERT INTO logs (sitename, ipaddress, user_id, location_id, protocol, source, created) \
+         s.db_query ("INSERT INTO logs (sitename, ipaddress, user_id, location_id, protocol, source, created) \
                            VALUES (%s, %s, %s, %s, %s, %s, NOW()) \
                   ", (request['sitename_save'], request['src_address'], user['id'], settings['location_id'], request['protocol'], "LEARN"))
       else :
          request['id'] = dyn['id']
-         db_cursor.execute ("UPDATE logs SET hitcount=hitcount+1 \
+         s.db_query ("UPDATE logs SET hitcount=hitcount+1 \
                               WHERE id = %s ", ( request['id'] ) )
 
 
@@ -445,7 +453,7 @@ class Proximus:
    def redirect_log(s):
       global request
 
-      db_cursor.execute ("INSERT INTO logs (sitename, ipaddress, user_id, protocol, location_id, source, created, hitcount) \
+      s.db_query ("INSERT INTO logs (sitename, ipaddress, user_id, protocol, location_id, source, created, hitcount) \
                            VALUES (%s, %s, %s, %s, %s, %s, NOW(), %s) \
                          ON DUPLICATE KEY UPDATE hitcount=hitcount+1 \
                   ", (request['sitename_save'], request['src_address'], user['id'], request['protocol'], settings['location_id'], "REDIRECT", 1 ))
@@ -454,7 +462,7 @@ class Proximus:
 
    # checks if a redirect has been logged and writes it into the db if not..
    def redirect_log_hit(s, id):
-      db_cursor.execute ("UPDATE logs SET hitcount=hitcount+1 WHERE id = %s", (request['id']))
+      s.db_query ("UPDATE logs SET hitcount=hitcount+1 WHERE id = %s", (request['id']))
 
 
    # send redirect to the browser
@@ -486,7 +494,7 @@ class Proximus:
       ##
 
       # check if user has already added site to dynamic rules
-      db_cursor.execute ("SELECT sitename, id, source \
+      s.db_query ("SELECT sitename, id, source \
                         FROM logs \
                         WHERE \
                               user_id = %s \
@@ -503,7 +511,7 @@ class Proximus:
          s.redirect_log_hit(request['id'])
          return s.grant()
       elif settings['subsite_sharing'] == "own_parents" :    # check if someone else has already added this site as a children
-         db_cursor.execute ("SELECT log2.sitename AS sitename, log2.id AS id \
+         s.db_query ("SELECT log2.sitename AS sitename, log2.id AS id \
                            FROM logs AS log1, logs AS log2 \
                            WHERE \
                                  log1.parent_id = log2.id \
@@ -514,7 +522,7 @@ class Proximus:
                                  %s RLIKE CONCAT( '.*[[.full-stop.]]', log1.sitename, '$' )) \
                            ", (request['protocol'], "REDIRECT", request['sitename'], request['sitename']))
          rows1 = db_cursor.fetchall()
-         db_cursor.execute ("SELECT sitename, id \
+         s.db_query ("SELECT sitename, id \
                            FROM logs \
                            WHERE \
                                  user_id = %s \
@@ -529,7 +537,7 @@ class Proximus:
                   s.debug("Debug REDIRECT; Log found with subsite sharing - own_parents; Log-id="+str(rows1['id']), 2)
                   return s.grant()
       elif settings['subsite_sharing'] == "all_parents" :  # check if someone else has already added this site as a children 
-         db_cursor.execute ("SELECT sitename, id \
+         s.db_query ("SELECT sitename, id \
                            FROM logs \
                            WHERE \
                                  parent_id IS NOT NULL \
@@ -570,7 +578,7 @@ class Proximus:
 
       # check if mail has already been sent
       db_cursor = settings['db_cursor']
-      db_cursor.execute ("SELECT id  \
+      s.db_query ("SELECT id  \
                            FROM maillog \
                            WHERE \
                               user_id = %s \
@@ -592,7 +600,7 @@ class Proximus:
          s.send_mail('Site '+request['sitename']+' has been blocked', "Dear User! \n\nYour request to "+scheme+"://"+request['sitename']+" has been blocked. \n\nIf you need access to this page please contact your Administrator.\n\nProXimus")
          
          # log that a mail has been sent
-         db_cursor.execute ("INSERT INTO maillog (sitename, user_id, protocol, sent) \
+         s.db_query ("INSERT INTO maillog (sitename, user_id, protocol, sent) \
                               VALUES (%s, %s, %s, NOW()) ", (request['sitename_save'], user['id'], request['protocol']))
          dyn = db_cursor.fetchone()
       return s.deny()
@@ -649,7 +657,7 @@ class Proximus:
       if ident != "-" :
          # get user
          try:
-            db_cursor.execute ("SELECT id, username, password, location_id, emailaddress, group_id FROM users WHERE username = %s AND active = 'Y'", ident)
+            s.db_query ("SELECT id, username, password, location_id, emailaddress, group_id FROM users WHERE username = %s AND active = 'Y'", ident)
             user = db_cursor.fetchone()
             user['emailaddress'] = user['emailaddress'].rstrip('\n')
          except TypeError:
@@ -696,7 +704,7 @@ class Proximus:
       ######
       ## Global blocked network check
       ##
-      db_cursor.execute ("SELECT network \
+      s.db_query ("SELECT network \
                FROM blockednetworks \
                WHERE \
                      ( location_id = %s \
@@ -723,7 +731,7 @@ class Proximus:
          # send user identification if the site is in the no-auth table;
          # in case it does we have that query
          # so commenting this out now
-         #db_cursor.execute ("SELECT sitename, protocol  \
+         #s.db_query ("SELECT sitename, protocol  \
          #                     FROM noauth_rules \
          #                     WHERE \
          #                           ( sitename = %s OR \
@@ -742,7 +750,7 @@ class Proximus:
 
       # check if we could retrieve user information
       if user['id'] != None :
-         db_cursor.execute ("SELECT id, sitename, policy, location_id, group_id, priority, description \
+         s.db_query ("SELECT id, sitename, policy, location_id, group_id, priority, description \
                   FROM rules \
                   WHERE \
                         ( group_id = %s \
