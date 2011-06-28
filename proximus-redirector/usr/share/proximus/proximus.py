@@ -33,7 +33,7 @@ passthrough_filename = "/etc/proximus/passthrough"
 
 class Proximus:
    def __init__(self, options):
-      global db_cursor, settings
+      global settings
 
       # configure syslog
       syslog.openlog('proximus',syslog.LOG_PID,syslog.LOG_LOCAL5)
@@ -197,6 +197,8 @@ class Proximus:
             self._writeline("")
          else:
             self.req_id += 1
+            self.debug(line, 1)
+            self.debug( self.check_auth(line) , 1)
             self._writeline( self.check_auth(line) )
          line = self._readline()
 
@@ -526,7 +528,7 @@ class Proximus:
          for row1 in rows1:
             for row2 in rows2:
                if row1['sitename'] == row2['sitename'] :
-                  s.debug("Debug REDIRECT; Log found with subsite sharing - own_parents; Log-id="+str(rows1['id']), 2)
+                  s.debug("Debug REDIRECT; Log found with subsite sharing - own_parents; Log-id=" + str(row1['id']), 2)
                   return s.grant()
       elif settings['subsite_sharing'] == "all_parents" :  # check if someone else has already added this site as a children 
          s.db_query ("SELECT sitename, id \
@@ -555,7 +557,7 @@ class Proximus:
       msg = MIMEText(body)
       msg['Subject'] = subject
       msg['From'] = "ProXimus"
-      msg['To'] = user['email']
+      msg['To'] = user['emailaddress']
       if settings['admincc'] == 1 :
          msg['Cc'] = settings['admin_email']
          smtp.sendmail(settings['admin_email'], settings['admin_email'], msg.as_string())
@@ -569,7 +571,6 @@ class Proximus:
          return s.deny()
 
       # check if mail has already been sent
-      db_cursor = settings['db_cursor']
       s.db_query ("SELECT id  \
                            FROM maillog \
                            WHERE \
@@ -619,6 +620,7 @@ class Proximus:
       (scheme,host,path,parameters,query,fragment) = uparse(url)
 
       # prepare username
+      user = {}
       user['ident'] = ident.lower()
       if settings['regex_cut'] != "" :
          user['ident'] = re.sub(settings['regex_cut'], "", user['ident'])
