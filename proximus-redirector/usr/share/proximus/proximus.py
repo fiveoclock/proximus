@@ -411,7 +411,7 @@ class Proximus:
 
    # called when a site is blocked
    def deny(s):
-      return "302:http://%s%s/forbidden.php" % ( settings['redirection_host'], settings['redirection_path'] )
+      return "302:http://%s%s/proximus.php?action=%s&site=%s" % ( settings['redirection_host'], settings['redirection_path'], "DENY", request['sitename'] )
 
    # called when access to a site is granted
    def grant(s):

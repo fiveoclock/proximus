@@ -1,4 +1,7 @@
 <?php
+//error_reporting(E_ALL);
+//ini_set('display_errors', true);
+
 session_start();
 # global variables
 $dbh;
@@ -92,6 +95,15 @@ elseif ( isset($_POST['parent_id']) && isset($_POST['confirm']) && isset($_POST[
    setcookie ("proximus", "confirm", time()+10 );
    #header("HTTP/1.1 301 Moved Permanently");
    header ("Location: ".$url);
+}
+elseif ( isset($_GET['action'] ) ) {
+   global $site;
+   $site = $_GET["site"];
+   $action = $_GET["action"];
+
+   if ($action == "DENY" ) {
+      header ("Location: deny.php");
+   }
 }
 
 

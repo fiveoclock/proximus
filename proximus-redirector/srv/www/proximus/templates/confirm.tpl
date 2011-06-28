@@ -1,29 +1,34 @@
 <html>
 <head>
-   <title>{$title_text|escape}</title>
-   <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<title>{$title_text|escape}</title>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><link rel="stylesheet" type="text/css" href="css/style.css" media="all" />
 </head>
- 
-<body> {* This is a little comment that won't be visible in the HTML source *}
+<body>
+<div id="header">
 
+<img id=logo src="images/logo.png">
+<div id="title">
+ProXimus
+</div>
+
+<div id="slogan">{$title|escape}</div>
+</div>
+
+<div id="nav">
+<a href="#" onClick="history.go(-1)">Go back</a></div>
+
+
+<div id="content">
+<div id="maincontent">
 <br>
-<table width="95%" cellpadding="10" cellpadding="0">
-   <tr>
-      <th valign="top" width="150" bgcolor="#CCEECC">
-         <img src="img/logo.png">
-      </th>
-      <th align="left" bgcolor="#DDFFDD">
-         <br>
-         <h2>User confirmation required</h2>
-         <br>
+
+<center>
 {$body_html}
-         <br>
-      </th>
-   </tr>
-</table>
+</center>
 
+</div>
+</div>
 
-
- 
-</body><!-- this is a little comment that will be seen in the HTML source -->
+</body>
 </html>
+
