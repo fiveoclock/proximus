@@ -55,12 +55,14 @@ class Proximus:
       self.debug("Settings: " + pprint.pformat(settings, 3), 3 )
 
       # set timezone according to settings
-      if settings['timezone'] != None:
+      if settings['timezone'] != '':
          self.db_query ("SET time_zone = %s", ( settings['timezone']) )
          self.db_query ("SELECT CURTIME() AS now")
          time = db_cursor.fetchone()
          self.debug("Timezone was set to: " + settings['timezone'] + "; current time is now: " + str(time['now']), 0)
       else:
+         self.db_query ("SELECT CURTIME() AS now")
+         time = db_cursor.fetchone()
          self.debug("Current time is now: " + str(time['now']), 0)
 
    def read_configfile(self):
