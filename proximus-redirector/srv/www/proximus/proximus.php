@@ -17,8 +17,10 @@ if ( getRequest() )  {
    # case 1: no cookie -> redirect to confirmation page
    # case 2: cookie present -> add subsite entry
 
-   # check if request is faked
-   $result = mysql_query("SELECT sitename, ipaddress, protocol, hitcount, users.id AS userid, username, realname FROM logs, users WHERE user_id = users.id AND logs.id = $log_id");
+   # fetch request details from database
+   $result = mysql_query("SELECT sitename, ipaddress, protocol, hitcount, users.id AS userid, username, realname
+                              FROM logs, users
+                              WHERE user_id = users.id AND logs.id = $log_id");
    $row = mysql_fetch_assoc($result);
    if ($site != $row['sitename']) {
       setcookie ("proximus", "confirm", time()-3600 );
@@ -44,7 +46,6 @@ if ( getRequest() )  {
       $data['parent_id'] = $log_id;
       $data['url'] = $url;
       $data['row'] = $row;
-      $data['settings'] = $settings;
       $_SESSION["id_$log_id"] = $data;
 
       header ("Location: " . $_SERVER['PHP_SELF'] . "?action=confirm");
@@ -132,8 +133,7 @@ elseif ( isset($_GET['action'] ) ) {
          If you need access to this site for good reasons please contact your IT Administrator.
          </dt>
       </dl>
-      </center>
-      ";
+      </center> ";
       $smarty = setupSmarty("ProXimus - Access denied", "Site blocked by policy", $body);
       $smarty->display('default.tpl'); 
    }
@@ -146,8 +146,7 @@ else {
       <dt>
       Choose from the menu above.
       </dt>
-   </dl>
-   ";
+   </dl> ";
 
    $smarty = setupSmarty("ProXimus", "Start", $body);
    $smarty->display('default.tpl');
@@ -178,7 +177,7 @@ function setupSmarty($title="ProXimus", $subject="", $body="") {
 }
 
 function getRequest() {
-   if ( isset($_GET["site"]) && isset($_GET["id"]) && isset($_GET["url"]) ) {
+   if ( $_GET["action"] == "confirm" && isset($_GET["site"]) && isset($_GET["id"]) && isset($_GET["url"]) ) {
       # check if parameters are set
       
       global $site, $log_id, $url;

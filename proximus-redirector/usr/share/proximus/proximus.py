@@ -469,11 +469,11 @@ class Proximus:
    def redirect_send(s):
       if request['protocol'] == "SSL" :
          # default redirection method - if not further specified
-         return "302:%sproximus.php?site=%s&id=%s&url=%s" % (settings['redirection_url'], request['sitename_save'], request['id'], base64.b64encode("https://"+request['sitename']))
+         return "302:%sproximus.php?action=confirm&site=%s&id=%s&url=%s" % (settings['redirection_url'], request['sitename_save'], request['id'], base64.b64encode("https://"+request['sitename']))
 
       else:
          # its http
-         return "302:%sproximus.php?site=%s&id=%s&url=%s" % (settings['redirection_url'], request['sitename_save'], request['id'], base64.b64encode(request['url']))
+         return "302:%sproximus.php?action=confirm&site=%s&id=%s&url=%s" % (settings['redirection_url'], request['sitename_save'], request['id'], base64.b64encode(request['url']))
 
 
    # called when a request is redirected
