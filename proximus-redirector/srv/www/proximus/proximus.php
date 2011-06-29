@@ -47,7 +47,7 @@ if ( getRequest() )  {
       $data['settings'] = $settings;
       $_SESSION["id_$log_id"] = $data;
 
-      header ("Location: confirm.php");
+      header ("Location: " . $_SERVER['PHP_SELF'] . "?action=confirm");
    }
    elseif ( isset($_COOKIE['proximus']) && isset($_SESSION['parent_id']) ) {
       # if a valid cookie is present and session parent_id is set
@@ -87,11 +87,44 @@ elseif ( isset($_POST['parent_id']) && isset($_POST['confirm']) && isset($_POST[
 }
 elseif ( isset($_GET['action'] ) ) {
    global $site;
-   $site = $_GET["site"];
    $action = $_GET["action"];
 
+   if ($action == "confirm" ) {
+      $cur_id = $_SESSION['parent_id'];
+      $data = $_SESSION["id_$cur_id"];
+
+      $body = "
+      <center>
+      <dl>
+         <dt>You were trying to access the following site: </dt>
+         <dt><a href=\"".$data['url']."\">". $data['url'] ."</a></dd>
+         <br><br>
+         <dd>Username: ".$data['row']['username']."</dd>
+         <dd>Site: ".    $data['row']['sitename']."</dd>
+         <dd>Protocol: ".$data['row']['protocol']."</dd>
+         <dd>Log ID: ".  $data['parent_id'] . "
+          /  Client: ".  $data['row']['ipaddress']."</dd>
+      </dl>
+      <br> " . '
+
+      <dl><dt>Click the confirm button below to whitelist this site</dt></dl><br>
+
+      <form action="' . $_SERVER['PHP_SELF'] .'" method="post">
+         <input type="hidden" name="url" value="' . $data['url'] . '">
+         <input type="hidden" name="parent_id" value="' . $cur_id . '">
+         <input type="submit" name="confirm" value="Confirm" >
+      </form>
+      <center> ';
+
+      $smarty = setupSmarty("ProXimus - Confirmation", "User confirmation required", $body);
+      $smarty->display('default.tpl'); 
+   }
+
+
    if ($action == "DENY" ) {
+     $site = $_GET["site"];
      $body = "
+      <center>
       <dl>
          <dt>
          Access to the site you requested is denied due to User-Policy restrictions. <br><br> 
@@ -99,11 +132,27 @@ elseif ( isset($_GET['action'] ) ) {
          If you need access to this site for good reasons please contact your IT Administrator.
          </dt>
       </dl>
+      </center>
       ";
       $smarty = setupSmarty("ProXimus - Access denied", "Site blocked by policy", $body);
       $smarty->display('default.tpl'); 
    }
+   
+
 }
+else {
+   $body = "
+   <dl>
+      <dt>
+      Choose from the menu above.
+      </dt>
+   </dl>
+   ";
+
+   $smarty = setupSmarty("ProXimus", "Start", $body);
+   $smarty->display('default.tpl');
+}
+
 
 
 /////////////////

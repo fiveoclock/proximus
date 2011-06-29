@@ -26,9 +26,7 @@ ProXimus
 <div id="maincontent">
 <br>
 
-<center>
 {$body_html}
-</center>
 
 </div>
 </div>
