@@ -11,11 +11,15 @@
 ProXimus
 </div>
 
-<div id="slogan">{$title|escape}</div>
+<div id="slogan">{$subject|escape}</div>
 </div>
 
 <div id="nav">
-<a href="#" onClick="history.go(-1)">Go back</a></div>
+{if isset( $settings.login_url ) } 
+   <a href="{$settings.login_url}">Login</a>
+{/if}
+<a href="#" onClick="history.go(-1);return false">Go back</a>
+</div>
 
 
 <div id="content">

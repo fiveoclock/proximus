@@ -1,0 +1,369 @@
+/***************************************************************************
+*                                                                          *
+* contented1 - An open source xhtml/css website template by Contented      *
+* Designs.  You're free to modify it and use it for any purpose without    *
+* cost or obligation. We'd prefer that you leave the link to our website   *
+* in the footer but it's not required.                                     *
+*                                                                          *
+* If you have comments or questions, please contact us at                  *
+* http://www.ContentedDesigns.com. Thanks!                                 *
+*                                                                          *
+* Version: 1.02 (May 17, 2006)                                             *
+***************************************************************************/
+
+* {
+	padding:0;
+	margin:0;
+}
+
+body {
+	color: #666666;
+	background-color:#f1f1f1;
+	font-family:Verdana, Arial, Helvetica, sans-serif;
+	font-size:83%;
+	margin:20px auto;
+	width: 90%;
+}
+
+h1, h2, h3 {
+  margin: 1em 0;
+}
+   
+h4, h5, h6, p, pre, blockquote, label, ul, ol, dl, fieldset, address { 
+  margin: 0 0 8px 0;
+}
+
+h1 {font-size:167%;}
+
+h2 {font-size:139%;}
+
+h3 {font-size:120%;}
+
+h4 {font-size:100%;}
+
+li, dd { 
+   margin-left:2em; 
+   margin-bottom: 5px;
+}
+
+dt { 
+   font-weight: bold;
+   margin-top: 15px;
+   font-size:110%
+}
+
+/*fieldset { padding: .5em; } */
+
+fieldset {
+   border: 1px solid #ccc;
+   margin-top: 20px;
+   padding: 0px 15px;
+}
+fieldset legend {
+   color: #6699FF;
+   font-size: 110%;
+   font-weight: bold;
+}
+fieldset fieldset {
+   margin-top: 0px;
+   margin-bottom: 20px;
+   padding: 16px 10px;
+}
+fieldset fieldset legend {
+   font-size: 120%;
+   font-weight: normal;
+}
+fieldset fieldset div {
+   clear: left;
+   margin: 0 20px;
+}
+
+form div {
+   clear: both;
+   margin-bottom: 1em;
+   padding: .5em;
+   vertical-align: text-top;
+}
+form div.input {
+   color: #444;
+   font-weight: bold;
+}
+form div.required {
+   color: #333;
+   font-weight: bold;
+}
+
+
+form div.submit {
+   border: 0;
+   float: left;
+   clear: none;
+   margin-top: 10px;
+   margin-left: 20px;
+   padding: 5px;
+   width: 100px;
+}
+form div.button {
+   border: 0;
+   float: left;
+   clear: none;
+   margin-top: 10px;
+   margin-left: 20px;
+   padding: 5px;
+   width: 100px;
+}
+
+label {
+   display: block;
+   font-size: 110%;
+   padding-right: 20px;
+}
+input, textarea {
+   font-family: "frutiger linotype", "lucida grande", "verdana", sans-serif;
+   padding: 1px;
+   width: 100px;
+   margin-left: 15px;
+}
+select {
+   clear: both;
+   vertical-align: text-bottom;
+   margin-left: 15px;
+}
+
+select[multiple=multiple] {
+   width: 90%;
+   margin-left: 15px;
+}
+option {
+   padding: 0px 8px;
+}
+
+input[type=text] {
+   width: 40%;
+   margin-left: 15px;
+}
+input[type=password] {
+   width: 40%;
+   margin-left: 15px;
+}
+input[type=checkbox] {
+   clear: left;
+   float: left;
+   margin: 0px 6px 7px 2px;
+   width: auto;
+}
+input[type=radio] {
+   float:left;
+   width:auto;
+   margin: 0 3px 7px 0;
+}
+div.radio label {
+   margin: 0 0 6px 20px;
+}
+.disabled {
+#   float: left;
+   display: inline;
+}
+/*input[type=button] {
+   display: inline;
+   font-size: 110%;
+   padding: 2px 5px;
+   width: auto;
+   vertical-align: bottom;
+}*/
+
+
+div.message {
+	font-weight: bold;
+   padding-left: 14px;
+   margin-top: 6px;
+   padding-bottom: 6px;
+}
+
+a {
+	color: #6699FF;
+	font-weight: bold;
+	text-decoration: none;
+}
+
+a:hover {
+	color: #3366FF;
+	font-weight: bold;
+	text-decoration: underline;
+}
+
+#header {
+	color: #6699FF;
+	width: 98%;
+	clear:both;
+}
+
+#title {
+	color:#6699FF;
+	font-size:300%;
+	font-weight:bold;
+	padding:6px 0px 8px 0px;
+	float:left;
+}
+
+#contact {
+	padding:0px 0px 0px 0px;
+	float:right;
+}
+
+#contact a {
+	color:#6699FF;
+	font-weight:bold;
+	text-decoration:none;
+}
+
+#contact a:hover {
+	color:#3366FF;
+	text-decoration:underline;
+}
+
+#slogan {
+	color:#666666;
+	font-size:117%;
+	font-weight:bold;
+	font-style:normal;
+	padding:0px 0px 0px 0px;
+	width: 50%;
+	clear:left;
+	float:left;
+}
+
+#nav {
+	line-height:250%;
+	padding: 15px 0px 0px 0px;
+	margin:0 0 5px 0;
+	width: 85%;
+	clear:left;
+}
+
+#nav a {
+	color: #ffffff;
+	background-color:#6699FF;
+	font-weight:bold;
+	text-decoration:none;
+	padding:4px 15px 4px 15px;
+	border:1px solid #3366FF;
+}
+
+#nav .selected,#nav a:hover {
+	color:#ffffff;
+	background-color:#3366FF;
+	text-decoration:none;
+	padding:4px 15px 4px 15px;
+}
+
+#content {
+	border-top:1px solid #CCCCCC;
+	/**width:760px;*/
+	width: 98%;
+	clear:both;
+}
+
+#maincontent {
+	font-size:99%;
+	padding:0px 5px 0px 0px;
+   width: 99%;
+	/*width:990px;
+	border-right:1px solid #CCCCCC;*/
+	float:left;
+}
+
+#sidecontent {
+	font-size:83%;
+	padding:5px 0px 0px 0px;
+	width:195px;
+	float:right;
+}
+
+#footer {
+	color: #FFFFFF;
+	background-color:#6699FF;
+	font-size:80%;
+	line-height:150%;
+	width: 98%;
+	clear:both;
+}
+
+#footer	a {
+	  color: #FFFFFF;
+	  background-color: #6699FF;
+	  text-decoration: none;
+	  }
+
+#footer	a:hover {
+	  color: #FFFFFF;
+	  background-color: #6699FF;
+	  font-weight: bold;
+	  text-decoration: underline;
+	  }
+
+#copyrightdesign {
+	color:#FFFFFF;
+   margin-top: 20px;
+	background-color:#6699FF;
+	padding:5px 0px 5px 20px;
+	width: 98%;
+	float:left;
+}
+
+#footercontact {
+	color:#FFFFFF;
+   margin-top: 20px;
+	background-color:#6699FF;
+	padding:5px 0px 5px 50px;
+	width:130px;
+	float:right;
+}
+#logo {
+   padding:0px 0px 0px 0px;
+   margin-right: 20px;
+   float:right;
+   clear:none;
+}
+.parent{
+   text-align: left;
+}
+.child{
+   text-align: left;
+   padding-left: 35px;
+}
+
+/* tables */
+
+table {  
+  width: 99%;   
+  border: 1px solid #ccc;
+  color:#333; 
+  background-color: #fff;
+  clear:both;    
+  padding: 0;
+  margin: 0 0 2em 0;
+  white-space: normal;
+}
+th {
+  background-color: #ccc;
+  border-top: 1px solid #fff;
+  border-left: 1px solid #fff;
+  border-right: 1px solid #003d4c;
+  border-bottom: 1px solid #003d4c;
+  text-align: center;
+  padding:1px;
+}
+table tr td {
+  border-right: 1px solid #ccc;
+  padding:2px 2px;
+  vertical-align:top;
+  text-align: center;
+}
+table tr:hover {
+   background-color: #f0f0f0;
+}
+table tr.oddRows td {
+  background: #f4f4f4;
+}
+
