@@ -2,8 +2,8 @@
 @include_once 'smarty/libs/Smarty.class.php';
 error_reporting(E_ALL);
 ini_set('display_errors', true);
-
 session_start();
+
 # global variables
 $settings; $site; $log_id; $url;
 
