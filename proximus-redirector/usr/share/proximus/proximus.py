@@ -197,8 +197,6 @@ class Proximus:
             self._writeline("")
          else:
             self.req_id += 1
-            self.debug(line, 1)
-            self.debug( self.check_auth(line) , 1)
             self._writeline( self.check_auth(line) )
          line = self._readline()
 
@@ -683,6 +681,29 @@ class Proximus:
          return False;
 
 
+   # tests if a sitename matches
+   def checkSitename(s, sitename, rule):
+      if rule.startswith("regex:") :
+         # if its a regex rule strip off the prefix
+         regex = re.sub("^regex:", "", rule)
+      else :
+         if ( rule == "*" ) or ( rule == sitename ) :
+            return True
+         else :
+            # convert from our matching syntax to regex
+            rule = rule.replace('.', '\.') # escape the dot
+            rule = rule.replace('-', '\-') # escape the dash.. could mean range
+            rule = rule.replace('*', '.*') # prepend star with a dot
+            regex = ".*\." + rule + "$"
+
+      # check if the regex matches
+      # print rule + " / " + regex + " :"
+      if re.search(regex, sitename) != None :
+         return True
+      else :
+         return False
+
+
    def check_request(s, line):
       global request
 
@@ -753,31 +774,31 @@ class Proximus:
                         ( location_id = %s \
                         OR location_id = 1 ) \
                      AND \
-                        ( sitename = %s OR \
-                        %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
+                        ( protocol = %s \
+                        OR protocol = '*' ) \
                      AND \
-                        ( protocol = %s OR \
-                        protocol = '*' ) \
-                     AND \
-                        ( starttime is NULL AND endtime is NULL OR \
-                        starttime <= NOW() AND NOW() <= endtime ) \
+                        ( starttime is NULL AND endtime is NULL \
+                        OR starttime <= NOW() AND NOW() <= endtime ) \
                   ORDER BY priority DESC, location_id",
-                  (user['group_id'], user['location_id'], request['sitename'], request['sitename'], request['protocol']))
+                  (user['group_id'], user['location_id'], request['protocol']))
       rules = db_cursor.fetchall()
       for rule in rules:
-         s.debug("Req  "+ str(s.req_id) +": Rule found; " + pprint.pformat(rule), 2)
-         if rule['policy'] == "ALLOW" :
-            return s.grant()
-         elif rule['policy'].startswith("REDIRECT") :
-            request['redirection_method'] = rule['policy']
-            return s.redirect()
-         elif rule['policy'] == "DENY_MAIL" :
-            return s.deny_mail_user()
-         elif rule['policy'] == "DENY" :
-            return s.deny()
-         elif rule['policy'] == "LEARN" :
-            s.learn()
-            return s.grant()
+         if s.checkSitename( request['sitename'], rule['sitename'] ) :
+            s.debug("Req  "+ str(s.req_id) +": Rule found; " + pprint.pformat(rule), 2)
+            if rule['policy'] == "ALLOW" :
+               return s.grant()
+            elif rule['policy'].startswith("REDIRECT") :
+               request['redirection_method'] = rule['policy']
+               return s.redirect()
+            elif rule['policy'] == "DENY_MAIL" :
+               return s.deny_mail_user()
+            elif rule['policy'] == "DENY" :
+               return s.deny()
+            elif rule['policy'] == "LEARN" :
+               s.learn()
+               return s.grant()
+         else :
+            s.debug("Req  "+ str(s.req_id) +": Rule doesn't match; " + pprint.pformat(rule), 4)
 
       s.debug("Req  "+ str(s.req_id) +": no rule found; using default deny", 2)
 
