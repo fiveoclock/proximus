@@ -9,11 +9,11 @@ import struct
 import syslog
 import pprint # for debugging
 
-import urlparse
 import re
 import base64
 import smtplib
 from email.MIMEText import MIMEText
+from urlparse import urlparse
 
 from apscheduler.scheduler import Scheduler
 import hashlib
@@ -24,7 +24,7 @@ import ConfigParser
 
 # define globaly used variables
 settings = {}
-request = {'sitename':None, 'sitename_save':None, 'protocol':None, 'siteport':None, 'src_address':None, 'url':None, 'redirection_method':None, 'id':None }
+request = {'sitename':None, 'sitename_save':None, 'protocol':None, 'src_address':None, 'url':None, 'redirection_method':None, 'id':None }
 user = {'id':None, 'username':None, 'location_id':None, 'group_id':None, 'emailaddress':None }
 
 config_filename = "/etc/proximus/proximus.conf"
@@ -601,11 +601,29 @@ class Proximus:
       return s.deny()
 
 
-   def parse_line(s, line):
-      # clear previous request data
-      request = {}
-      uparse, ujoin = urlparse.urlparse , urlparse.urljoin
+   def parse_url(s, url, method="GET"):
+      # also keep the original url
+      r = {}
+      r['url'] = url
+      #uparse, ujoin = urlparse.urlparse , urlparse.urljoin
 
+      if method == "CONNECT" :
+         """it's ssl"""
+         r['protocol'] = "SSL"
+         r['sitename'] = url.split(":", 1)[0]
+      else :
+         """it' http"""
+         r['protocol'] = "HTTP"
+         # scheme://host/path;parameters?query#fragment
+         (scheme,host,path,parameters,query,fragment) = urlparse(url)
+         r['sitename'] = host.split(":", 1)[0]
+
+      # prepare for latter use...
+      r['sitename_save'] = re.sub("^www\.", "", r['sitename'])
+      return r
+
+
+   def parse_line(s, line):
       withdraw = string.split(line)
       if len(withdraw) >= 5:
          # all needed parameters are given
@@ -617,8 +635,8 @@ class Proximus:
          # not enough parameters - deny
          return False
 
-      # scheme://host/path;parameters?query#fragment
-      (scheme,host,path,parameters,query,fragment) = uparse(url)
+      # parse url and fill request
+      request = s.parse_url(url, method)
 
       # prepare username
       if settings['regex_cut'] != "" :
@@ -626,22 +644,6 @@ class Proximus:
 
       # remove "/-" from source ip address
       request['src_address'] = re.sub("/.*", "", src_address)
-      request['url'] = url
-
-      if method == "CONNECT" :
-         """it's ssl"""
-         request['protocol'] = "SSL"
-         request['sitename'] = scheme
-         request['siteport'] = path
-      else:
-         """it' http"""
-         request['protocol'] = "HTTP"
-         request['sitename'] = host.split(":", 1)[0]
-         try:
-            request['siteport'] = host.split(":", 1)[1]
-         except IndexError,e:
-            request['siteport'] = "80"
-      request['sitename_save'] = re.sub("^www\.", "", request['sitename'])
       return request
 
 
