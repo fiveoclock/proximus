@@ -145,7 +145,7 @@ class Proximus:
 
       try:
          # Get proxy specific settings
-         self.db_query("SELECT location_id, redirection_host, redirection_path, smtpserver, admin_email, admincc, timezone \
+         self.db_query("SELECT location_id, redirection_url, smtpserver, admin_email, admincc, timezone \
                            FROM proxy_settings \
                            WHERE fqdn_proxy_hostname = %s", ( fqdn_hostname ))
          query = db_cursor.fetchone()
@@ -158,7 +158,11 @@ class Proximus:
          query = db_cursor.fetchall()
          for row in query:
             settings[row['name']] = row['value']
-      
+
+         # set redirection_host
+         r = self.parse_url( settings['redirection_url'] )
+         settings['redirection_host'] = r['sitename']
+
       # catch error if no settings are stored;
       # and activate passthrough mode
       except :
@@ -409,7 +413,7 @@ class Proximus:
 
    # called when a site is blocked
    def deny(s):
-      return "302:http://%s%s/proximus.php?action=%s&site=%s" % ( settings['redirection_host'], settings['redirection_path'], "DENY", request['sitename'] )
+      return "302:%sproximus.php?action=%s&site=%s" % ( settings['redirection_url'], "DENY", request['sitename'] )
 
    # called when access to a site is granted
    def grant(s):
@@ -417,7 +421,7 @@ class Proximus:
 
    # takes the user home...
    def takeHome(s):
-      return "302:http://%s%s/proximus.php" % ( settings['redirection_host'], settings['redirection_path'] )
+      return "302:%sproximus.php" % ( settings['redirection_url'] )
 
    # called when a request has to be learned
    def learn(s):
@@ -465,11 +469,11 @@ class Proximus:
    def redirect_send(s):
       if request['protocol'] == "SSL" :
          # default redirection method - if not further specified
-         return "302:http://%s%s/proximus.php?site=%s&id=%s&url=%s" % (settings['redirection_host'], settings['redirection_path'], request['sitename_save'], request['id'], base64.b64encode("https://"+request['sitename']))
+         return "302:%sproximus.php?site=%s&id=%s&url=%s" % (settings['redirection_url'], request['sitename_save'], request['id'], base64.b64encode("https://"+request['sitename']))
 
       else:
          # its http
-         return "302:http://%s%s/proximus.php?site=%s&id=%s&url=%s" % (settings['redirection_host'], settings['redirection_path'], request['sitename_save'], request['id'], base64.b64encode(request['url']))
+         return "302:%sproximus.php?site=%s&id=%s&url=%s" % (settings['redirection_url'], request['sitename_save'], request['id'], base64.b64encode(request['url']))
 
 
    # called when a request is redirected
@@ -605,7 +609,6 @@ class Proximus:
       # also keep the original url
       r = {}
       r['url'] = url
-      #uparse, ujoin = urlparse.urlparse , urlparse.urljoin
 
       if method == "CONNECT" :
          """it's ssl"""
