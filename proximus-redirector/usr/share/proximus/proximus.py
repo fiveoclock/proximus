@@ -25,7 +25,7 @@ import ConfigParser
 # define globaly used variables
 settings = {}
 request = {'sitename':None, 'sitename_save':None, 'protocol':None, 'siteport':None, 'src_address':None, 'url':None, 'redirection_method':None, 'id':None }
-user = {'ident':None, 'id':None, 'username':None, 'location_id':None, 'group_id':None, 'emailaddress':None }
+user = {'id':None, 'username':None, 'location_id':None, 'group_id':None, 'emailaddress':None }
 
 config_filename = "/etc/proximus/proximus.conf"
 passthrough_filename = "/etc/proximus/passthrough"
@@ -415,6 +415,10 @@ class Proximus:
    def grant(s):
       return ""
 
+   # takes the user home...
+   def takeHome(s):
+      return "302:http://%s%s/proximus.php" % ( settings['redirection_host'], settings['redirection_path'] )
+
    # called when a request has to be learned
    def learn(s):
       global request
@@ -598,7 +602,6 @@ class Proximus:
 
 
    def parse_line(s, line):
-      global request, user
       # clear previous request data
       request = {}
       uparse, ujoin = urlparse.urlparse , urlparse.urljoin
@@ -618,10 +621,8 @@ class Proximus:
       (scheme,host,path,parameters,query,fragment) = uparse(url)
 
       # prepare username
-      user = {}
-      user['ident'] = ident.lower()
       if settings['regex_cut'] != "" :
-         user['ident'] = re.sub(settings['regex_cut'], "", user['ident'])
+         request['user'] = re.sub(settings['regex_cut'], "", ident.lower() )
 
       # remove "/-" from source ip address
       request['src_address'] = re.sub("/.*", "", src_address)
@@ -641,32 +642,30 @@ class Proximus:
          except IndexError,e:
             request['siteport'] = "80"
       request['sitename_save'] = re.sub("^www\.", "", request['sitename'])
+      return request
 
 
    def fetch_userinfo(s, ident):
-      global user
+      if (ident == "-") or (ident == "") :
+         return None
 
-      if ident != "-" :
-         # get user
-         try:
-            s.db_query ("SELECT id, username, password, location_id, emailaddress, group_id FROM users WHERE username = %s AND active = 'Y'", ident)
-            user = db_cursor.fetchone()
-            user['emailaddress'] = user['emailaddress'].rstrip('\n')
-         except TypeError:
-            user = None
-      else :
-         user = None
+      # get user
+      try:
+         s.db_query ("SELECT id, username, password, location_id, emailaddress, group_id FROM users WHERE username = %s AND active = 'Y'", ident)
+         user = db_cursor.fetchone()
+         user['emailaddress'] = user['emailaddress'].rstrip('\n')
+      except TypeError:
+         return None
 
       #pprint.pprint(user)   ## debug
       if user != None :
          s.debug("Req  "+ str(s.req_id) +": User found; " + pprint.pformat(user) , 3)
       else :
          s.debug("Req  "+ str(s.req_id) +": No user found; ident="+ident, 2)
-    
+
+      return user
       # make all vars lowercase to make sure they match
-      #sitename = escape(sitename)
       #ident = escape(ident.lower())
-      #src_address = escape(src_address)
 
 
    # tests if a ip address is within a subnet
@@ -682,7 +681,7 @@ class Proximus:
 
 
    # tests if a sitename matches
-   def checkSitename(s, sitename, rule):
+   def check_sitename(s, sitename, rule):
       if rule.startswith("regex:") :
          # if its a regex rule strip off the prefix
          regex = re.sub("^regex:", "", rule)
@@ -705,15 +704,20 @@ class Proximus:
 
 
    def check_request(s, line):
-      global request
+      global request, user
 
-      if s.parse_line(line) == False:
+      request = s.parse_line(line)
+      if request == False:
          return s.deny()
-      s.fetch_userinfo(user['ident'])
+
+      user = s.fetch_userinfo(request['user'])
 
       # allow access to to proximuslog website
       if request['sitename'] == settings['redirection_host'] :
          return s.grant()
+      # shortcut
+      if request['sitename'] == "proximus" :
+         return s.takeHome()
 
 
       ######
@@ -783,7 +787,7 @@ class Proximus:
                   (user['group_id'], user['location_id'], request['protocol']))
       rules = db_cursor.fetchall()
       for rule in rules:
-         if s.checkSitename( request['sitename'], rule['sitename'] ) :
+         if s.check_sitename( request['sitename'], rule['sitename'] ) :
             s.debug("Req  "+ str(s.req_id) +": Rule found; " + pprint.pformat(rule), 2)
             if rule['policy'] == "ALLOW" :
                return s.grant()
