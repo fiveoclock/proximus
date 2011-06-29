@@ -102,6 +102,8 @@ elseif ( isset($_GET['action'] ) ) {
    $action = $_GET["action"];
 
    if ($action == "DENY" ) {
+      $_SESSION['site'] = $site;
+
       header ("Location: deny.php");
    }
 }

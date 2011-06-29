@@ -6,12 +6,11 @@
 
 session_start();
 
-$cur_id = $_SESSION['parent_id'];
-$data = $_SESSION["id_$cur_id"];
+$site = $_SESSION['site'];
 
 $text .= "<dl>";
 $text .= "<dt>";
-$text .= "Access to the site you requested is denied due to User-Policy restrictions. <br><br>If you need access to this site for good reasons please contact your IT Administrator.";
+$text .= "Access to the site you requested is denied due to User-Policy restrictions. <br><br> Site: $site <br><br><br>If you need access to this site for good reasons please contact your IT Administrator.";
 $text .= "</dt>";
 $text .= "</dl>";
 
