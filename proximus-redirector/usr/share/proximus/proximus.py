@@ -371,19 +371,19 @@ class Proximus:
       if len(creds) < 2:
          s.debug("Auth failed; input has wrong format; should be 'username password'", 2)
          return s.auth_deny()
-      else :
-         username = creds[0]
-         password = creds[1]
 
-         salt = settings['auth_salt']
-         s.fetch_userinfo(username)
-         pwhash = s.get_sha1(password, salt)
-         if user and ( user['password'] == pwhash ):
-            s.debug("Auth OK; user: %s" % username, 3)
-            return s.auth_grant()
-         else :
-            s.debug("Auth failed; user: %s" % username, 2)
-            return s.auth_deny()
+      username = creds[0]
+      password = creds[1]
+      salt = settings['auth_salt']
+      user = s.fetch_userinfo(username)
+      pwhash = s.get_sha1(password, salt)
+
+      if user and ( user['password'] == pwhash ):
+         s.debug("Auth OK; user: %s" % username, 3)
+         return s.auth_grant()
+      else :
+         s.debug("Auth failed; user: %s" % username, 2)
+         return s.auth_deny()
 
    def auth_grant(s):
       return "OK"
