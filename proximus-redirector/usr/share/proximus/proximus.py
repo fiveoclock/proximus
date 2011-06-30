@@ -306,8 +306,8 @@ class Proximus:
 
    def start_list_update_thread(self):
       # prepare socket
-      self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-      self.s.setblocking(False)
+      self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+      self.socket.setblocking(False)
 
       # Start the scheduler
       self.sched = Scheduler()
@@ -318,15 +318,15 @@ class Proximus:
 
    def job_testbind(self):
       try:
-         self.s.bind(("127.0.0.1", settings['port']))
-         self.s.listen(1)
+         self.socket.bind(("127.0.0.1", settings['port']))
+         self.socket.listen(1)
 
          # deactivate bindtest job
          self.sched.unschedule_job(self.job_bind)
          # make a new mysql object for thread safe queries
          self.db_cursor_thread = self.db_connect()
          # Schedule update job
-         self.sched.add_interval_job(self.job_update, seconds = settings['list_update_interval'] )
+         self.thread_update = self.sched.add_interval_job(self.job_update, seconds = settings['list_update_interval'] )
          self.log("I'm now the master process!")
       except socket.error, e:
          None
@@ -334,7 +334,13 @@ class Proximus:
 
    def job_update(self):
       #self.log("running.......")
-      self.update_lists()
+      if not self.update_lists() :
+         self.log("Not master anymore!")
+         # deactivate update job
+         self.sched.unschedule_job(self.thread_update)
+         # close the connection
+         self.socket.close()
+         self.start_list_update_thread()
 
 
    def update_lists(s):
@@ -348,22 +354,31 @@ class Proximus:
                AND (location_id = %s OR location_id = 1 OR location_id IS NULL) \
                AND (valid_until IS NULL OR valid_until > NOW())" 
 
-      s.update_file("noauth_dst_ip", sql % ('IP', settings['location_id']) )
-      s.update_file("noauth_dst_dn", sql % ('DN', settings['location_id']) )
+      if not s.update_file("noauth_dst_ip", sql % ('IP', settings['location_id']) ) :
+         return False
+      if not s.update_file("noauth_dst_dn", sql % ('DN', settings['location_id']) ) :
+         return False
 
       if s.reloadNeeded == True:
          s.debug("Lists have changed Squid reload needed", 1)
          s.reload_parent()
       else:
          s.debug("Lists unchanged, no reload needed", 2)
+      # tell that updating went fine
+      return True
 
 
    def update_file(s, filename, query):
       # query the db using the thread db cursor
       # if we use the same cursor for both processes
       # they will interfere with each other
-      s.db_cursor_thread.execute(query)
-      rows = s.db_cursor_thread.fetchall()
+      try :
+         s.db_cursor_thread.execute(query)
+         rows = s.db_cursor_thread.fetchall()
+      except MySQLdb.OperationalError, e:
+         s.log("MySQL disconnected; Master exiting.")
+         # tell previous function that something went wrong
+         return False
 
       data = ""
       for row in rows:
@@ -380,13 +395,15 @@ class Proximus:
       if curhash != prehash :
          s.write_file( filename, data )
          s.reloadNeeded = True
+      # tell that everything went fine
+      return True
 
 
    def reload_parent(s):
       cmd = settings['reload_command']
       meth = settings['reload_method']
 
-      if ( meth == "command" ) and ( cmd ) :
+      if ( metH == "command" ) and ( cmd ) :
          s.log("Attention, going to reload squid now, using: + " + cmd )
          status, output = commands.getstatusoutput( cmd )
          s.log("Attention, output of reload command: " + output )
