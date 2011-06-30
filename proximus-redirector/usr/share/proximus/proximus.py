@@ -323,6 +323,8 @@ class Proximus:
 
          # deactivate bindtest job
          self.sched.unschedule_job(self.job_bind)
+         # make a new mysql object for thread safe queries
+         self.db_cursor_thread = self.db_connect()
          # Schedule update job
          self.sched.add_interval_job(self.job_update, seconds = settings['list_update_interval'] )
          self.log("I'm now the master process!")
@@ -336,7 +338,6 @@ class Proximus:
 
 
    def update_lists(s):
-      s.db_cursor = s.db_connect()
       s.reloadNeeded = False
 
       s.debug("Updating lists now", 2)
@@ -358,9 +359,11 @@ class Proximus:
 
 
    def update_file(s, filename, query):
-      # make query
-      s.db_query(query)
-      rows = s.db_cursor.fetchall()
+      # query the db using the thread db cursor
+      # if we use the same cursor for both processes
+      # they will interfere with each other
+      s.db_cursor_thread.execute(query)
+      rows = s.db_cursor_thread.fetchall()
 
       data = ""
       for row in rows:
