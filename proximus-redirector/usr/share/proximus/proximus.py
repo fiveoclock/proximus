@@ -1,6 +1,7 @@
 #!/usr/bin/python -u
 
 import sys,string
+import time
 import MySQLdb
 import MySQLdb.cursors
 import os, signal
@@ -32,6 +33,8 @@ passthrough_filename = "/etc/proximus/passthrough"
 
 
 class Proximus:
+   cache = {}
+
    def __init__(self, options):
       global settings
 
@@ -104,6 +107,12 @@ class Proximus:
       else :
          config['list_update_interval'] = 60
 
+      # update_interval
+      if config.has_key("cache_time") :
+         config['cache_time'] = int(config['cache_time'])
+      else :
+         config['cache_time'] = 60
+
       settings = config
       #pprint.pprint(settings)  ## debug
 
@@ -133,6 +142,36 @@ class Proximus:
          self.db_connect()
          db_cursor.execute(sql, args)
       return db_cursor
+
+
+   # updates the database cache
+   def db_query_cache_update(self, sql, args=None) :
+      self.db_query(sql, args)
+      result = db_cursor.fetchall()
+      self.cache[sql + str(args)] = {'time': int(time.time()), 'result': result }
+      self.debug("Number of cached queries: " + str(len(self.cache)), 8)
+      return result
+
+
+   # mysql wrapper that caches queries - how cool is that?
+   def db_query_cache(self, sql, args=None) :
+      if settings['cache_time'] <= 0 :
+         # if cache is turned off
+         self.db_query(sql, args)
+         return db_cursor.fetchall()
+
+      args_key = str(args)
+      if sql + args_key in self.cache :
+         if ( int(time.time()) - self.cache[sql + args_key]['time'] ) > settings['cache_time'] :
+            # if cache_time is over update the query cache
+            self.debug("Data from db - update..", 9)
+            return self.db_query_cache_update(sql, args)
+         else :
+            self.debug("Data from cache..", 9)
+            return self.cache[sql + args_key]['result']
+      else :
+         self.debug("Data from db..", 9)
+         return self.db_query_cache_update(sql, args)
 
 
    # Get settings from db and catch error if no settings are stored
@@ -656,10 +695,9 @@ class Proximus:
 
       # get user
       try:
-         s.db_query ("SELECT id, username, password, location_id, emailaddress, group_id FROM users WHERE username = %s AND active = 'Y'", ident)
-         user = db_cursor.fetchone()
+         user = s.db_query_cache("SELECT id, username, password, location_id, emailaddress, group_id FROM users WHERE username = %s AND active = 'Y'", ident)[0]
          user['emailaddress'] = user['emailaddress'].rstrip('\n')
-      except TypeError:
+      except (TypeError, IndexError), e:
          return None
 
       #pprint.pprint(user)   ## debug
@@ -707,6 +745,21 @@ class Proximus:
       else :
          return False
 
+   # check if it is a blocked network
+   def check_blocked_network(s, src_ip):
+      rows = s.db_query_cache ("SELECT network \
+               FROM blockednetworks \
+               WHERE \
+                     ( location_id = %s \
+                     OR location_id = 1 ) ",
+               (settings['location_id'] ))
+      for row in rows:
+         if src_ip == row['network'] :
+            return True
+         if s.addressInNetwork( src_ip,  row['network'] ) :
+            return True
+      return False
+
 
    def check_request(s, line):
       global request, user
@@ -728,18 +781,8 @@ class Proximus:
       ######
       ## Global blocked network check
       ##
-      s.db_query ("SELECT network \
-               FROM blockednetworks \
-               WHERE \
-                     ( location_id = %s \
-                     OR location_id = 1 ) ",
-               (settings['location_id'] ))
-      rows = db_cursor.fetchall()
-      for row in rows:
-         if request['src_address'] == row['network'] :
-            return s.deny();
-         if s.addressInNetwork( request['src_address'] ,  row['network'] ) :
-            return s.deny();
+      if s.check_blocked_network( request['src_address'] ) :
+         return s.deny()
 
 
       ######
@@ -774,7 +817,7 @@ class Proximus:
 
       # check if we could retrieve user information
       if user['id'] != None :
-         s.db_query ("SELECT id, sitename, policy, location_id, group_id, priority, description \
+         rules = s.db_query_cache ("SELECT id, sitename, policy, location_id, group_id, priority, description \
                   FROM rules \
                   WHERE \
                         ( group_id = %s \
@@ -790,7 +833,6 @@ class Proximus:
                         OR starttime <= NOW() AND NOW() <= endtime ) \
                   ORDER BY priority DESC, location_id",
                   (user['group_id'], user['location_id'], request['protocol']))
-      rules = db_cursor.fetchall()
       for rule in rules:
          if s.check_sitename( request['sitename'], rule['sitename'] ) :
             s.debug("Req  "+ str(s.req_id) +": Rule found; " + pprint.pformat(rule), 2)
@@ -812,7 +854,7 @@ class Proximus:
       s.debug("Req  "+ str(s.req_id) +": no rule found; using default deny", 2)
 
       # deny access if the request was not accepted until this point ;-)
-      return s.deny()
+      return s.grant()
 
 
 
