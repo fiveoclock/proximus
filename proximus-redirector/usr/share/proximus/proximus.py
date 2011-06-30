@@ -27,6 +27,7 @@ class Proximus:
    passthrough_filename = "/etc/proximus/passthrough"
    cache = {}
    db_cursor = None
+   db_cursor_thread = None
 
    def __init__(self, options):
       global settings
@@ -47,19 +48,11 @@ class Proximus:
       self.get_settings_from_db()
 
       # debugging....
-      #pprint.pprint(settings)  ## debug
       self.debug("Settings: " + pprint.pformat(settings, 3), 3 )
 
-      # set timezone according to settings
-      if settings['timezone'] != '':
-         self.db_query ("SET time_zone = %s", ( settings['timezone']) )
-         self.db_query ("SELECT CURTIME() AS now")
-         time = self.db_cursor.fetchone()
-         self.debug("Timezone was set to: " + settings['timezone'] + "; current time is now: " + str(time['now']), 0)
-      else:
-         self.db_query ("SELECT CURTIME() AS now")
-         time = self.db_cursor.fetchone()
-         self.debug("Current time is now: " + str(time['now']), 0)
+      # make sure the right time is used
+      self.set_timezone()
+
 
    def read_configfile(self):
       global settings
@@ -69,7 +62,7 @@ class Proximus:
 
       try:
          config = dict(cp.items('main'))
-      except MySQLdb.Error, e:
+      except :
          error_msg = "ERROR: config file not found: " + self.config_filename
          self.log(error_msg)
          self._writeline(error_msg)
@@ -116,7 +109,7 @@ class Proximus:
             user = settings['db_user'],
             passwd = settings['db_pass'],
             db = settings['db_name'], cursorclass=MySQLdb.cursors.DictCursor)
-         db_cursor = conn.cursor ()
+         db_cursor = conn.cursor()
       except MySQLdb.Error, e:
          error_msg = "ERROR: please make sure that database settings are correctly set in " + self.config_filename
          self.log("ERROR: activating passthrough-mode until config is present")
@@ -131,7 +124,7 @@ class Proximus:
       try:
          self.db_cursor.execute(sql, args)
       except (AttributeError, MySQLdb.OperationalError):
-         self.db_connect()
+         self.db_cursor = self.db_connect()
          self.db_cursor.execute(sql, args)
       return self.db_cursor
 
@@ -202,6 +195,20 @@ class Proximus:
          self.log(error_msg)
          self._writeline(error_msg)
          settings['passthrough'] = True
+
+
+   # set timezone according to settings
+   def set_timezone(self):
+      if settings['timezone'] != '':
+         self.db_query ("SET time_zone = %s", ( settings['timezone']) )
+         self.db_query ("SELECT CURTIME() AS now")
+         time = self.db_cursor.fetchone()
+         self.debug("Timezone was set to: " + settings['timezone'] + "; current time is now: " + str(time['now']), 0)
+      else:
+         self.db_query ("SELECT CURTIME() AS now")
+         time = self.db_cursor.fetchone()
+         self.debug("Current time is now: " + str(time['now']), 0)
+
 
    def run(self):
       # start list updating thread if configured
@@ -316,9 +323,8 @@ class Proximus:
 
          # deactivate bindtest job
          self.sched.unschedule_job(self.job_bind)
-         # Schedule job_function to be called every two hours
+         # Schedule update job
          self.sched.add_interval_job(self.job_update, seconds = settings['list_update_interval'] )
-         # remove the previous scheduled job
          self.log("I'm now the master process!")
       except socket.error, e:
          None
@@ -330,6 +336,7 @@ class Proximus:
 
 
    def update_lists(s):
+      s.db_cursor = s.db_connect()
       s.reloadNeeded = False
 
       s.debug("Updating lists now", 2)
