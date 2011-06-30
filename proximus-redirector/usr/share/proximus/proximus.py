@@ -22,17 +22,9 @@ import commands
 
 import ConfigParser
 
-
-# define globaly used variables
-settings = {}
-request = {'sitename':None, 'sitename_save':None, 'protocol':None, 'src_address':None, 'url':None, 'redirection_method':None, 'id':None }
-user = {'id':None, 'username':None, 'location_id':None, 'group_id':None, 'emailaddress':None }
-
-config_filename = "/etc/proximus/proximus.conf"
-passthrough_filename = "/etc/proximus/passthrough"
-
-
 class Proximus:
+   config_filename = "/etc/proximus/proximus.conf"
+   passthrough_filename = "/etc/proximus/passthrough"
    cache = {}
 
    def __init__(self, options):
@@ -72,18 +64,18 @@ class Proximus:
       global settings
 
       cp = ConfigParser.RawConfigParser()
-      cp.read( config_filename )
+      cp.read( self.config_filename )
 
       try:
          config = dict(cp.items('main'))
       except MySQLdb.Error, e:
-         error_msg = "ERROR: config file not found: " + config_filename
+         error_msg = "ERROR: config file not found: " + self.config_filename
          self.log(error_msg)
          self._writeline(error_msg)
          sys.exit(1)
 
-      if os.path.isfile(passthrough_filename) :
-         self.log("Warning, file: "+passthrough_filename+" exists; Passthrough mode activated")
+      if os.path.isfile(self.passthrough_filename) :
+         self.log("Warning, file: "+self.passthrough_filename+" exists; Passthrough mode activated")
          config['passthrough'] = True
       else :
          config['passthrough'] = False
@@ -127,7 +119,7 @@ class Proximus:
             db = settings['db_name'], cursorclass=MySQLdb.cursors.DictCursor)
          db_cursor = conn.cursor ()
       except MySQLdb.Error, e:
-         error_msg = "ERROR: please make sure that database settings are correctly set in " + config_filename
+         error_msg = "ERROR: please make sure that database settings are correctly set in " + self.config_filename
          self.log("ERROR: activating passthrough-mode until config is present")
          settings['passthrough'] = True
          self.log(error_msg)
@@ -464,8 +456,6 @@ class Proximus:
 
    # called when a request has to be learned
    def learn(s):
-      global request
-
       # check if site has already been learned
       s.db_query ("SELECT id \
                         FROM logs \
