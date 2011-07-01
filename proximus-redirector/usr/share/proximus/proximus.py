@@ -357,7 +357,7 @@ class Proximus:
 
    # mysql wrapper that caches queries - how cool is that?
    def verify_cache(self) :
-      self.debug("Queries in cache: " + str( len(self.cache) ), 2)
+      self.debug("Queries in cache: " + str( len(self.cache) ), 8)
       for key,entry in self.cache.items() :
          if ( int(time.time()) - entry['time'] ) > settings['cache_time'] :
             del self.cache[key]
@@ -840,7 +840,6 @@ class Proximus:
 
    def check_request(s, line):
       global request, user
-      print s.db_connected()
       if not s.db_connected() : s.grant()
 
       request = s.parse_line(line)
@@ -932,7 +931,7 @@ class Proximus:
 
       s.debug("Req  "+ str(s.req_id) +": no rule found; using default deny", 2)
 
-      # deny access if the request was not accepted until this point ;-)
+      # allow access if no rule did match until here ;-)
       return s.grant()
 
 
