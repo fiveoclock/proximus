@@ -28,7 +28,7 @@ class Proximus:
    config_filename = "/etc/proximus/proximus.conf"
    passthrough_filename = "/etc/proximus/passthrough"
    cache = {}
-   db_pool = [0]*2
+   db_pool = [None]*2
 
    sched = Scheduler()
    job_bind = None
@@ -56,7 +56,7 @@ class Proximus:
          self.set_timezone()
       else :
          error_msg = "ERROR: please make sure that database settings are correctly set in " + \
-            self.config_filename + "; activating passthrough-mode until config is present"
+            self.config_filename + "; activating passthrough-mode until database is available"
          settings['passthrough'] = True
          self.log(error_msg)
          self._writeline(error_msg)
@@ -161,10 +161,12 @@ class Proximus:
             cursor = self.db_query ("SELECT CURTIME() AS now")
             time = cursor.fetchone()
             self.debug("Timezone was set to: " + settings['timezone'] + "; current time is now: " + str(time['now']), 0)
+            return True
       else:
          cursor = self.db_query ("SELECT CURTIME() AS now")
          time = cursor.fetchone()
          self.debug("Current time is now: " + str(time['now']), 0)
+         return False
 
 
    def run(self):
@@ -201,11 +203,10 @@ class Proximus:
 
 
    def check_config(self):
-      settings['db_user'] = "***"
       settings['db_pass'] = "***"
       pprint.pprint(settings)
       self._writeline("")
-      self.log("Config seems to be ok")
+      self.log("If you didn't see any error messages above the config should be ok")
  
    ################
    ################
@@ -271,7 +272,6 @@ class Proximus:
       return self.db_pool[ self.get_db_index() ]
 
    def db_connect(self):
-      self.debug("db_connect - current connections: " + str( self.db_pool ), 1)
       try:
          conn = MySQLdb.connect (host = settings['db_host'],
             user = settings['db_user'],
@@ -283,59 +283,73 @@ class Proximus:
 
          # make sure the right time is used - when reconnecting
          self.set_timezone()
+         self.debug("db_connect - current connections: " + str( self.db_pool ), 1)
          return True
       except MySQLdb.Error, e:
          self.debug("db_connect - exception: " + str(e), 1)
+         self.db_pool[ self.get_db_index() ] = None
+         self.debug("db_connect - current connections: " + str( self.db_pool ), 1)
          return False
+
+
+   def db_connected(self, conn=None):
+      if conn == None : conn = self.get_db()
+      if conn == None : return False
+
 
    # wrapper to catch mysql disconnections
    def db_query(self, sql, args=None, conn=None ):
-      if conn == None :
-         conn = self.get_db()
-      cursor = conn.cursor()
+      if conn == None : conn = self.get_db()
       try:
+         cursor = conn.cursor()
          cursor.execute(sql, args)
+         return cursor
       except (AttributeError, MySQLdb.OperationalError), e:
          self.debug("db_query - exception: " + str(e), 1)
          time.sleep(5) # this is important - if mysql server is not ready yet proximus will crash
-         self.db_connect()
-         conn = self.get_db()
-         cursor = conn.cursor()
-         cursor.execute(sql, args)
-      return cursor
+         if self.db_connect() :
+            conn = self.get_db()
+            cursor = conn.cursor()
+            cursor.execute(sql, args)
+            return cursor
+         return None
 
 
    # updates the database cache
    def db_query_cache_update(self, sql, args=None, conn=None) :
-      if conn == None :
-         conn = self.get_db()
+      if conn == None : conn = self.get_db()
 
       cursor = self.db_query(sql, args, conn)
-      result = cursor.fetchall()
-      self.cache[sql + str(args)] = {'time': int(time.time()), 'result': result }
-      self.debug("Number of cached queries: " + str(len(self.cache)), 8)
-      return result
+      if cursor is not None:
+         result = cursor.fetchall()
+         self.cache[sql + str(args)] = {'time': int(time.time()), 'result': result }
+         self.debug("Number of cached queries: " + str(len(self.cache)), 8)
+         return result
+      else:
+         return None
 
 
    # mysql wrapper that caches queries - how cool is that?
    def db_query_cache(self, sql, args=None, conn=None) :
-      if conn == None :
-         conn = self.get_db()
+      if conn == None : conn = self.get_db()
 
       if settings['cache_time'] <= 0 :
-         # if cache is turned off
+         # if cache is turned off send do a query
          cursor = self.db_query(sql, args, conn)
          return cursor.fetchall()
 
       args_key = str(args)
+      # if key is in cache 
       if sql + args_key in self.cache :
+         # if cache_time is over update the query cache
          if ( int(time.time()) - self.cache[sql + args_key]['time'] ) > settings['cache_time'] :
-            # if cache_time is over update the query cache
             self.debug("Data from db - update..", 9)
             return self.db_query_cache_update(sql, args, conn)
+         # if cache_time is not yet over return from cache
          else :
             self.debug("Data from cache..", 9)
             return self.cache[sql + args_key]['result']
+      # if we don't have it in cache, save it
       else :
          self.debug("Data from db..", 9)
          return self.db_query_cache_update(sql, args, conn)
@@ -362,13 +376,17 @@ class Proximus:
       try:
          self.socket.bind(("127.0.0.1", settings['port']))
          self.socket.listen(1)
-
-         # deactivate bindtest job
-         self.sched.unschedule_job(self.job_bind)
          # Schedule update job
-         self.db_connect() # connect the db for the thread now
-         self.job_listupdate = self.sched.add_interval_job(self.job_update, seconds = settings['list_update_interval'] )
-         self.log("I'm now the master process!")
+
+         # if database connection is established go on
+         if self.db_connect() :
+            # deactivate bindtest job
+            self.sched.unschedule_job(self.job_bind)
+            # schedule new update lists job
+            self.job_listupdate = self.sched.add_interval_job(self.job_update, seconds = settings['list_update_interval'] )
+            self.log("I'm the master process now!")
+         else :
+            self.socket.close()
       except socket.error, e:
          None
 
@@ -753,7 +771,7 @@ class Proximus:
       if user != None :
          s.debug("Req  "+ str(s.req_id) +": User found; " + pprint.pformat(user) , 3)
       else :
-         s.debug("Req  "+ str(s.req_id) +": No user found; ident="+ident, 2)
+         s.debug("Req  "+ str(s.req_id) +": User not found; ident="+ident, 2)
 
       return user
       # make all vars lowercase to make sure they match
@@ -812,6 +830,8 @@ class Proximus:
 
    def check_request(s, line):
       global request, user
+      print s.db_connected()
+      if not s.db_connected() : s.grant()
 
       request = s.parse_line(line)
       if request == False:
