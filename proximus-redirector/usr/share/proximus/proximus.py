@@ -17,6 +17,8 @@ from email.MIMEText import MIMEText
 from urlparse import urlparse
 
 from apscheduler.scheduler import Scheduler
+import threading
+import logging  # apscheduler needs this when it has an exception
 import hashlib
 import commands
 
@@ -26,8 +28,10 @@ class Proximus:
    config_filename = "/etc/proximus/proximus.conf"
    passthrough_filename = "/etc/proximus/passthrough"
    cache = {}
-   db_cursor = None
-   db_cursor_thread = None
+   db_pool = [0]*2
+
+   sched = Scheduler()
+   job_bind = None
 
    def __init__(self, options):
       global settings
@@ -37,6 +41,8 @@ class Proximus:
       self.stdin   = sys.stdin
       self.stdout  = sys.stdout
 
+      logging.basicConfig()
+
       # set options
       settings = options
       # read config file and connect to the database
@@ -44,7 +50,7 @@ class Proximus:
       # combine / overwrite settings with passed options again... - kind of stupid..
       settings = dict(settings, **options)
 
-      self.db_cursor = self.db_connect()
+      self.db_connect()
       self.get_settings_from_db()
 
       # debugging....
@@ -103,62 +109,6 @@ class Proximus:
       #pprint.pprint(settings)  ## debug
 
 
-   def db_connect(self):
-      try:
-         conn = MySQLdb.connect (host = settings['db_host'],
-            user = settings['db_user'],
-            passwd = settings['db_pass'],
-            db = settings['db_name'], cursorclass=MySQLdb.cursors.DictCursor)
-         db_cursor = conn.cursor()
-      except MySQLdb.Error, e:
-         error_msg = "ERROR: please make sure that database settings are correctly set in " + self.config_filename
-         self.log("ERROR: activating passthrough-mode until config is present")
-         settings['passthrough'] = True
-         self.log(error_msg)
-         self._writeline(error_msg)
-      return db_cursor
-
-
-   # wrapper to catch mysql disconnections
-   def db_query(self, sql, args=None):
-      try:
-         self.db_cursor.execute(sql, args)
-      except (AttributeError, MySQLdb.OperationalError):
-         self.db_cursor = self.db_connect()
-         self.db_cursor.execute(sql, args)
-      return self.db_cursor
-
-
-   # updates the database cache
-   def db_query_cache_update(self, sql, args=None) :
-      self.db_query(sql, args)
-      result = self.db_cursor.fetchall()
-      self.cache[sql + str(args)] = {'time': int(time.time()), 'result': result }
-      self.debug("Number of cached queries: " + str(len(self.cache)), 8)
-      return result
-
-
-   # mysql wrapper that caches queries - how cool is that?
-   def db_query_cache(self, sql, args=None) :
-      if settings['cache_time'] <= 0 :
-         # if cache is turned off
-         self.db_query(sql, args)
-         return self.db_cursor.fetchall()
-
-      args_key = str(args)
-      if sql + args_key in self.cache :
-         if ( int(time.time()) - self.cache[sql + args_key]['time'] ) > settings['cache_time'] :
-            # if cache_time is over update the query cache
-            self.debug("Data from db - update..", 9)
-            return self.db_query_cache_update(sql, args)
-         else :
-            self.debug("Data from cache..", 9)
-            return self.cache[sql + args_key]['result']
-      else :
-         self.debug("Data from db..", 9)
-         return self.db_query_cache_update(sql, args)
-
-
    # Get settings from db and catch error if no settings are stored
    def get_settings_from_db(self):
       global settings
@@ -169,17 +119,17 @@ class Proximus:
 
       try:
          # Get proxy specific settings
-         self.db_query("SELECT location_id, redirection_url, smtpserver, admin_email, admincc, timezone \
+         cursor = self.db_query("SELECT location_id, redirection_url, smtpserver, admin_email, admincc, timezone \
                            FROM proxy_settings \
                            WHERE fqdn_proxy_hostname = %s", ( fqdn_hostname ))
-         query = self.db_cursor.fetchone()
+         query = cursor.fetchone()
 
          # combine with settings with existing ones
          settings = dict(settings, **query)
 
          # Get global settings
-         self.db_query ("SELECT name, value FROM global_settings")
-         query = self.db_cursor.fetchall()
+         cursor = self.db_query ("SELECT name, value FROM global_settings")
+         query = cursor.fetchall()
          for row in query:
             settings[row['name']] = row['value']
 
@@ -189,8 +139,9 @@ class Proximus:
 
       # catch error if no settings are stored;
       # and activate passthrough mode
-      except :
-         error_msg = "ERROR: please make sure that a config for this node is stored in the database. Table-name: proxy_settings - Full qualified domain name: " + fqdn_hostname
+      except Exception, e :
+         s.debug("get_settings_from_db - exception: " + str(e), 1)
+         error_msg = "ERROR: please make sure that a config for this node is stored in the database. Table-name: proxy_settings - Full qualified domain name: " + fqdn_hostname + "; "
          self.log("ERROR: activating passthrough-mode until config is present")
          self.log(error_msg)
          self._writeline(error_msg)
@@ -199,14 +150,15 @@ class Proximus:
 
    # set timezone according to settings
    def set_timezone(self):
-      if settings['timezone'] != '':
-         self.db_query ("SET time_zone = %s", ( settings['timezone']) )
-         self.db_query ("SELECT CURTIME() AS now")
-         time = self.db_cursor.fetchone()
-         self.debug("Timezone was set to: " + settings['timezone'] + "; current time is now: " + str(time['now']), 0)
+      if "timezone" in settings :
+         if ( settings['timezone'] != '' ) :
+            self.db_query("SET time_zone = %s", ( settings['timezone']) )
+            cursor = self.db_query ("SELECT CURTIME() AS now")
+            time = cursor.fetchone()
+            self.debug("Timezone was set to: " + settings['timezone'] + "; current time is now: " + str(time['now']), 0)
       else:
-         self.db_query ("SELECT CURTIME() AS now")
-         time = self.db_cursor.fetchone()
+         cursor = self.db_query ("SELECT CURTIME() AS now")
+         time = cursor.fetchone()
          self.debug("Current time is now: " + str(time['now']), 0)
 
 
@@ -223,10 +175,10 @@ class Proximus:
             self._writeline("")
          else:
             self.req_id += 1
-            self.debug("Req  " + str(self.req_id) + ": " + line, 1)
+            self.debug("Req  " + str(self.req_id) + ": " + line, 2)
             response = self.check_request(line)
             self._writeline(response)
-            self.debug("Resp " + str(self.req_id) + ": " + response, 1)
+            self.debug("Resp " + str(self.req_id) + ": " + response, 2)
          line = self._readline()
 
 
@@ -300,6 +252,95 @@ class Proximus:
 
    ################
    ################
+   ## Database functions
+   ########
+   ########
+
+   def get_db_index(self):
+      if threading.current_thread().name == "MainThread" :
+         return 0
+      else :
+         return 1
+
+   def get_db(self):
+      return self.db_pool[ self.get_db_index() ]
+
+   def db_connect(self):
+      self.debug("db_connect - current connections: " + str( self.db_pool ), 1)
+      try:
+         conn = MySQLdb.connect (host = settings['db_host'],
+            user = settings['db_user'],
+            passwd = settings['db_pass'],
+            db = settings['db_name'], cursorclass=MySQLdb.cursors.DictCursor)
+
+         # store the connection in the pool
+         self.db_pool[ self.get_db_index() ] = conn
+
+         # make sure the right time is used - when reconnecting
+         self.set_timezone()
+      except MySQLdb.Error, e:
+         self.debug("db_connect - exception: " + str(e), 1)
+         error_msg = "ERROR: please make sure that database settings are correctly set in " + self.config_filename
+         self.log("ERROR: activating passthrough-mode until config is present")
+         settings['passthrough'] = True
+         self.log(error_msg)
+         self._writeline(error_msg)
+
+   # wrapper to catch mysql disconnections
+   def db_query(self, sql, args=None, conn=None ):
+      if conn == None :
+         conn = self.get_db()
+      cursor = conn.cursor()
+      try:
+         cursor.execute(sql, args)
+      except (AttributeError, MySQLdb.OperationalError), e:
+         self.debug("db_query - exception: " + str(e), 1)
+         time.sleep(5) # this is important - if mysql server is not ready yet proximus will crash
+         self.db_connect()
+         conn = self.get_db()
+         cursor = conn.cursor()
+         cursor.execute(sql, args)
+      return cursor
+
+
+   # updates the database cache
+   def db_query_cache_update(self, sql, args=None, conn=None) :
+      if conn == None :
+         conn = self.get_db()
+
+      cursor = self.db_query(sql, args, conn)
+      result = cursor.fetchall()
+      self.cache[sql + str(args)] = {'time': int(time.time()), 'result': result }
+      self.debug("Number of cached queries: " + str(len(self.cache)), 8)
+      return result
+
+
+   # mysql wrapper that caches queries - how cool is that?
+   def db_query_cache(self, sql, args=None, conn=None) :
+      if conn == None :
+         conn = self.get_db()
+
+      if settings['cache_time'] <= 0 :
+         # if cache is turned off
+         cursor = self.db_query(sql, args, conn)
+         return cursor.fetchall()
+
+      args_key = str(args)
+      if sql + args_key in self.cache :
+         if ( int(time.time()) - self.cache[sql + args_key]['time'] ) > settings['cache_time'] :
+            # if cache_time is over update the query cache
+            self.debug("Data from db - update..", 9)
+            return self.db_query_cache_update(sql, args, conn)
+         else :
+            self.debug("Data from cache..", 9)
+            return self.cache[sql + args_key]['result']
+      else :
+         self.debug("Data from db..", 9)
+         return self.db_query_cache_update(sql, args, conn)
+
+
+   ################
+   ################
    ## updating of files
    ########
    ########
@@ -310,7 +351,6 @@ class Proximus:
       self.socket.setblocking(False)
 
       # Start the scheduler
-      self.sched = Scheduler()
       self.sched.start()
       # Schedule job_function to be called
       self.job_bind = self.sched.add_interval_job(self.job_testbind, seconds=5)
@@ -323,10 +363,9 @@ class Proximus:
 
          # deactivate bindtest job
          self.sched.unschedule_job(self.job_bind)
-         # make a new mysql object for thread safe queries
-         self.db_cursor_thread = self.db_connect()
          # Schedule update job
-         self.thread_update = self.sched.add_interval_job(self.job_update, seconds = settings['list_update_interval'] )
+         self.db_connect()
+         self.job_listupdate = self.sched.add_interval_job(self.job_update, seconds = settings['list_update_interval'] )
          self.log("I'm now the master process!")
       except socket.error, e:
          None
@@ -334,13 +373,7 @@ class Proximus:
 
    def job_update(self):
       #self.log("running.......")
-      if not self.update_lists() :
-         self.log("Not master anymore!")
-         # deactivate update job
-         self.sched.unschedule_job(self.thread_update)
-         # close the connection
-         self.socket.close()
-         self.start_list_update_thread()
+      self.update_lists()
 
 
    def update_lists(s):
@@ -372,13 +405,10 @@ class Proximus:
       # query the db using the thread db cursor
       # if we use the same cursor for both processes
       # they will interfere with each other
-      try :
-         s.db_cursor_thread.execute(query)
-         rows = s.db_cursor_thread.fetchall()
-      except MySQLdb.OperationalError, e:
-         s.log("MySQL disconnected; Master exiting.")
-         # tell previous function that something went wrong
-         return False
+      cursor = s.db_query (query)
+      rows = cursor.fetchall()
+      #s.log("MySQL disconnected; Master exiting.")
+      # tell previous function that something went wrong
 
       data = ""
       for row in rows:
@@ -484,7 +514,7 @@ class Proximus:
    # called when a request has to be learned
    def learn(s):
       # check if site has already been learned
-      s.db_query ("SELECT id \
+      cursor = s.db_query ("SELECT id \
                         FROM logs \
                         WHERE \
                            user_id = %s \
@@ -494,7 +524,7 @@ class Proximus:
                               ( sitename = %s OR \
                               %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
                         ", (user['id'], request['protocol'], "REDIRECT", request['sitename'], request['sitename']))
-      dyn = s.db_cursor.fetchone()
+      dyn = cursor.fetchone()
       if (dyn == None) :
          s.db_query ("INSERT INTO logs (sitename, ipaddress, user_id, location_id, protocol, source, created) \
                            VALUES (%s, %s, %s, %s, %s, %s, NOW()) \
@@ -509,11 +539,11 @@ class Proximus:
    def redirect_log(s):
       global request
 
-      s.db_query ("INSERT INTO logs (sitename, ipaddress, user_id, protocol, location_id, source, created, hitcount) \
+      cursor = s.db_query ("INSERT INTO logs (sitename, ipaddress, user_id, protocol, location_id, source, created, hitcount) \
                            VALUES (%s, %s, %s, %s, %s, %s, NOW(), %s) \
                          ON DUPLICATE KEY UPDATE hitcount=hitcount+1 \
                   ", (request['sitename_save'], request['src_address'], user['id'], request['protocol'], settings['location_id'], "REDIRECT", 1 ))
-      request['id'] = s.db_cursor.lastrowid
+      request['id'] = cursor.lastrowid
 
 
    # checks if a redirect has been logged and writes it into the db if not..
@@ -550,7 +580,7 @@ class Proximus:
       ##
 
       # check if user has already added site to dynamic rules
-      s.db_query ("SELECT sitename, id, source \
+      cursor = s.db_query ("SELECT sitename, id, source \
                         FROM logs \
                         WHERE \
                               user_id = %s \
@@ -560,14 +590,14 @@ class Proximus:
                               ( sitename = %s OR \
                               %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
                         ", (user['id'], request['protocol'], "REDIRECT", request['sitename'], request['sitename']))
-      dyn = s.db_cursor.fetchone()
+      dyn = cursor.fetchone()
       if (dyn != None) :   # user is allowed to access this site
          s.debug("Req  "+ str(s.req_id) +": REDIRECT; Log found; " + pprint.pformat(dyn), 2 )
          request['id'] = dyn['id']
          s.redirect_log_hit(request['id'])
          return s.grant()
       elif settings['subsite_sharing'] == "own_parents" :    # check if someone else has already added this site as a children
-         s.db_query ("SELECT log2.sitename AS sitename, log2.id AS id \
+         cursor = s.db_query ("SELECT log2.sitename AS sitename, log2.id AS id \
                            FROM logs AS log1, logs AS log2 \
                            WHERE \
                                  log1.parent_id = log2.id \
@@ -577,15 +607,15 @@ class Proximus:
                                  ( log1.sitename = %s OR \
                                  %s RLIKE CONCAT( '.*[[.full-stop.]]', log1.sitename, '$' )) \
                            ", (request['protocol'], "REDIRECT", request['sitename'], request['sitename']))
-         rows1 = s.db_cursor.fetchall()
-         s.db_query ("SELECT sitename, id \
+         rows1 = cursor.fetchall()
+         cursor = s.db_query ("SELECT sitename, id \
                            FROM logs \
                            WHERE \
                                  user_id = %s \
                                  AND parent_id IS NULL \
                                  AND source != %s \
                            ", (user['id'], "REDIRECT"))
-         rows2 = s.db_cursor.fetchall()
+         rows2 = cursor.fetchall()
 
          for row1 in rows1:
             for row2 in rows2:
@@ -593,7 +623,7 @@ class Proximus:
                   s.debug("Debug REDIRECT; Log found with subsite sharing - own_parents; Log-id=" + str(row1['id']), 2)
                   return s.grant()
       elif settings['subsite_sharing'] == "all_parents" :  # check if someone else has already added this site as a children 
-         s.db_query ("SELECT sitename, id \
+         cursor = s.db_query ("SELECT sitename, id \
                            FROM logs \
                            WHERE \
                                  parent_id IS NOT NULL \
@@ -602,7 +632,7 @@ class Proximus:
                                  ( sitename = %s OR \
                                  %s RLIKE CONCAT( '.*[[.full-stop.]]', sitename, '$' )) \
                            ", ("REDIRECT", request['sitename'], request['sitename']))
-         all = s.db_cursor.fetchone()
+         all = cursor.fetchone()
          if (all != None) :
             s.debug("Debug REDIRECT; Log found with subsite sharing - all_parents; Log-id="+str(all['id']), 2)
             return s.grant()
@@ -633,7 +663,7 @@ class Proximus:
          return s.deny()
 
       # check if mail has already been sent
-      s.db_query ("SELECT id  \
+      cursor = s.db_query ("SELECT id  \
                            FROM maillog \
                            WHERE \
                               user_id = %s \
@@ -645,7 +675,7 @@ class Proximus:
                                  ( protocol = %s OR \
                                  protocol = '*' ) \
                               ", (user['id'], settings['mail_interval'], request['sitename'], request['sitename'], request['protocol']) )
-      result = s.db_cursor.fetchone()
+      result = cursor.fetchone()
       if (result == None) : # no mail has been sent recently
          if request['protocol'] == "SSL" :
             scheme = "https"
@@ -655,9 +685,9 @@ class Proximus:
          s.send_mail('Site '+request['sitename']+' has been blocked', "Dear User! \n\nYour request to "+scheme+"://"+request['sitename']+" has been blocked. \n\nIf you need access to this page please contact your Administrator.\n\nProXimus")
          
          # log that a mail has been sent
-         s.db_query ("INSERT INTO maillog (sitename, user_id, protocol, sent) \
+         cursor = s.db_query ("INSERT INTO maillog (sitename, user_id, protocol, sent) \
                               VALUES (%s, %s, %s, NOW()) ", (request['sitename_save'], user['id'], request['protocol']))
-         dyn = s.db_cursor.fetchone()
+         dyn = cursor.fetchone()
       return s.deny()
 
 
@@ -815,7 +845,7 @@ class Proximus:
          # send user identification if the site is in the no-auth table;
          # in case it does we have that query
          # so commenting this out now
-         #s.db_query ("SELECT sitename, protocol  \
+         # cursor = s.db_query ("SELECT sitename, protocol  \
          #                     FROM noauth_rules \
          #                     WHERE \
          #                           ( sitename = %s OR \
@@ -823,7 +853,7 @@ class Proximus:
          #                        AND \
          #                           ( protocol = %s OR \
          #                           protocol = '*' )", (request['sitename'], request['sitename'], request['protocol']) )
-         #rows = s.db_cursor.fetchall()
+         #rows = cursor.fetchall()
          #for row in rows:
          #   return grant()
 
