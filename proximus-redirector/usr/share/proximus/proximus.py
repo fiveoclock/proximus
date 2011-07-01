@@ -306,7 +306,7 @@ class Proximus:
          return cursor
       except (AttributeError, MySQLdb.OperationalError), e:
          self.debug("db_query - exception: " + str(e), 1)
-         time.sleep(5) # this is important - if mysql server is not ready yet proximus will crash
+         time.sleep(10) # this is important - if mysql server is not ready yet proximus will crash
          if self.db_connect() :
             conn = self.get_db()
             cursor = conn.cursor()
@@ -355,6 +355,14 @@ class Proximus:
          return self.db_query_cache_update(sql, args, conn)
 
 
+   # mysql wrapper that caches queries - how cool is that?
+   def verify_cache(self) :
+      self.debug("Queries in cache: " + str( len(self.cache) ), 2)
+      for key,entry in self.cache.items() :
+         if ( int(time.time()) - entry['time'] ) > settings['cache_time'] :
+            del self.cache[key]
+
+
    ################
    ################
    ## updating of files
@@ -373,6 +381,7 @@ class Proximus:
 
 
    def job_testbind(self):
+      self.verify_cache()
       try:
          self.socket.bind(("127.0.0.1", settings['port']))
          self.socket.listen(1)
@@ -394,6 +403,7 @@ class Proximus:
    def job_update(self):
       #self.log("running.......")
       self.update_lists()
+      self.verify_cache()
 
 
    def update_lists(s):
