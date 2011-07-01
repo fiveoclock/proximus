@@ -50,14 +50,19 @@ class Proximus:
       # combine / overwrite settings with passed options again... - kind of stupid..
       settings = dict(settings, **options)
 
-      self.db_connect()
-      self.get_settings_from_db()
+      if self.db_connect() :
+         self.get_settings_from_db()
+         # make sure the right time is used
+         self.set_timezone()
+      else :
+         error_msg = "ERROR: please make sure that database settings are correctly set in " + \
+            self.config_filename + "; activating passthrough-mode until config is present"
+         settings['passthrough'] = True
+         self.log(error_msg)
+         self._writeline(error_msg)
 
       # debugging....
       self.debug("Settings: " + pprint.pformat(settings, 3), 3 )
-
-      # make sure the right time is used
-      self.set_timezone()
 
 
    def read_configfile(self):
@@ -278,13 +283,10 @@ class Proximus:
 
          # make sure the right time is used - when reconnecting
          self.set_timezone()
+         return True
       except MySQLdb.Error, e:
          self.debug("db_connect - exception: " + str(e), 1)
-         error_msg = "ERROR: please make sure that database settings are correctly set in " + self.config_filename
-         self.log("ERROR: activating passthrough-mode until config is present")
-         settings['passthrough'] = True
-         self.log(error_msg)
-         self._writeline(error_msg)
+         return False
 
    # wrapper to catch mysql disconnections
    def db_query(self, sql, args=None, conn=None ):
@@ -364,7 +366,7 @@ class Proximus:
          # deactivate bindtest job
          self.sched.unschedule_job(self.job_bind)
          # Schedule update job
-         self.db_connect()
+         self.db_connect() # connect the db for the thread now
          self.job_listupdate = self.sched.add_interval_job(self.job_update, seconds = settings['list_update_interval'] )
          self.log("I'm now the master process!")
       except socket.error, e:
