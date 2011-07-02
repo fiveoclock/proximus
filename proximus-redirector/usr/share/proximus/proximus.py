@@ -207,7 +207,8 @@ class Proximus:
       pprint.pprint(settings)
       self._writeline("")
       self.log("If you didn't see any error messages above the config should be ok")
- 
+
+
    ################
    ################
    ## Basic functions
