@@ -432,13 +432,8 @@ class Proximus:
 
 
    def update_file(s, filename, query):
-      # query the db using the thread db cursor
-      # if we use the same cursor for both processes
-      # they will interfere with each other
       cursor = s.db_query (query)
       rows = cursor.fetchall()
-      #s.log("MySQL disconnected; Master exiting.")
-      # tell previous function that something went wrong
 
       data = ""
       for row in rows:
