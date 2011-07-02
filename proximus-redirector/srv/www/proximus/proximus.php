@@ -177,7 +177,7 @@ function setupSmarty($title="ProXimus", $subject="", $body="") {
 }
 
 function getRequest() {
-   if ( $_GET["action"] == "confirm" && isset($_GET["site"]) && isset($_GET["id"]) && isset($_GET["url"]) ) {
+   if ( isset($_GET["site"]) && isset($_GET["id"]) && isset($_GET["url"]) && $_GET["action"] == "confirm" ) {
       # check if parameters are set
       
       global $site, $log_id, $url;
