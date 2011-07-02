@@ -262,15 +262,19 @@ class Proximus:
    ########
    ########
 
+   # returns the correct index number for the database pool for each thread
    def get_db_index(self):
       if threading.current_thread().name == "MainThread" :
          return 0
       else :
          return 1
 
+   # returns the right database for each thread
    def get_db(self):
       return self.db_pool[ self.get_db_index() ]
 
+
+   # connects the database for each thread
    def db_connect(self):
       try:
          conn = MySQLdb.connect (host = settings['db_host'],
@@ -292,11 +296,6 @@ class Proximus:
          return False
 
 
-   def db_connected(self, conn=None):
-      if conn == None : conn = self.get_db()
-      if conn == None : return False
-
-
    # wrapper to catch mysql disconnections
    def db_query(self, sql, args=None, conn=None ):
       if conn == None : conn = self.get_db()
@@ -312,20 +311,6 @@ class Proximus:
             cursor = conn.cursor()
             cursor.execute(sql, args)
             return cursor
-         return None
-
-
-   # updates the database cache
-   def db_query_cache_update(self, sql, args=None, conn=None) :
-      if conn == None : conn = self.get_db()
-
-      cursor = self.db_query(sql, args, conn)
-      if cursor is not None:
-         result = cursor.fetchall()
-         self.cache[sql + str(args)] = {'time': int(time.time()), 'result': result }
-         self.debug("Number of cached queries: " + str(len(self.cache)), 8)
-         return result
-      else:
          return None
 
 
@@ -355,12 +340,36 @@ class Proximus:
          return self.db_query_cache_update(sql, args, conn)
 
 
-   # mysql wrapper that caches queries - how cool is that?
+   # makes a query and saves the result in the cache
+   # should not be used directly
+   def db_query_cache_update(self, sql, args=None, conn=None) :
+      if conn == None : conn = self.get_db()
+
+      cursor = self.db_query(sql, args, conn)
+      if cursor is not None:
+         result = cursor.fetchall()
+         self.cache[sql + str(args)] = {'time': int(time.time()), 'result': result }
+         self.debug("Number of cached queries: " + str(len(self.cache)), 8)
+         return result
+      else:
+         return None
+
+
+   # deletes old entries from cache 
    def verify_cache(self) :
       self.debug("Queries in cache: " + str( len(self.cache) ), 8)
       for key,entry in self.cache.items() :
          if ( int(time.time()) - entry['time'] ) > settings['cache_time'] :
             del self.cache[key]
+
+
+   # tells if the database is connected
+   def db_connected(self, conn=None):
+      if conn == None : conn = self.get_db()
+      if conn == None :
+         return False
+      else :
+         return True
 
 
    ################
@@ -380,12 +389,13 @@ class Proximus:
       self.job_bind = self.sched.add_interval_job(self.job_testbind, seconds=5)
 
 
+   # try to open a socket as mutex and start updating of files if successful
+   # also delete outdated entries from cache
    def job_testbind(self):
       self.verify_cache()
       try:
          self.socket.bind(("127.0.0.1", settings['port']))
          self.socket.listen(1)
-         # Schedule update job
 
          # if database connection is established go on
          if self.db_connect() :
@@ -400,12 +410,14 @@ class Proximus:
          None
 
 
+   # update the lists and verify the cache
    def job_update(self):
       #self.log("running.......")
       self.update_lists()
       self.verify_cache()
 
 
+   # update the files and reload the parent if needed
    def update_lists(s):
       s.reloadNeeded = False
 
@@ -431,6 +443,7 @@ class Proximus:
       return True
 
 
+   # update the given file with the query result
    def update_file(s, filename, query):
       cursor = s.db_query (query)
       rows = cursor.fetchall()
@@ -443,8 +456,7 @@ class Proximus:
       filename = settings['vardir'] + filename
       prehash = s.get_md5( s.read_file(filename) )
       curhash = s.get_md5( data )
-      #print prehash
-      #print curhash
+      #print prehash + " : " + curhash
 
       # compare hashes and reload if needed
       if curhash != prehash :
@@ -454,6 +466,7 @@ class Proximus:
       return True
 
 
+   # reloads the parent (squid) according to the setting in the config
    def reload_parent(s):
       cmd = settings['reload_command']
       meth = settings['reload_method']
@@ -470,6 +483,7 @@ class Proximus:
          s.log("Attention, not reloading since no valid 'reload_method' is configured in the config: " + meth )
 
 
+   # does what it says
    def get_md5(s, str):
       md5 = hashlib.md5()
       if str != None:
