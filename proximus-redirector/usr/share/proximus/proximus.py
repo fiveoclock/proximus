@@ -861,7 +861,7 @@ class Proximus:
       if request['sitename'] == settings['redirection_host'] :
          return s.grant()
       # shortcut
-      if request['sitename'] == "proximus" :
+      if request['sitename'] in ["proximus", "proxy"] :
          return s.takeHome()
 
 
