@@ -5,8 +5,8 @@ Maintainer: Alexander Ganster <alexander.ganster@gmail.com>
 Uploaders: Alexander Ganster <alexander.ganster@gmail.com>
 Build-Depends: debhelper (>= 5)
 Standards-Version: 3.7.3
-Homepage: http://www.proximus.org
-Vcs-Svn: git://git.proximus.org/proximus.git
+Homepage: http://proximus.5-o-clock.net
+Vcs-Git: git://github.com/fiveoclock/proximus.git
 Dm-Upload-Allowed: yes
 
 Package: proximus
@@ -19,4 +19,5 @@ Description: Flexible management interface for squid proxy
  .
   * Management of rules per location/group/user
   * Administrators can be defined per location
-  * Definition of global rules
+  * Dynamic whitelisting of sites
+  * LDAP authentication for admins

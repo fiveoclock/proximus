@@ -1,3 +1,4 @@
 etc/proximus
 etc/cron.d
 srv/www/proximus
+var/lib/proximus

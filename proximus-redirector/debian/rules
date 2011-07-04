@@ -42,21 +42,19 @@ install: build
 	install -d ${DESTDIR}/etc/proximus
 	install -d ${DESTDIR}/usr/share/proximus
 	install -d ${DESTDIR}/srv/www/proximus
-	install -d ${DESTDIR}/srv/www/proximus/img
+	install -d ${DESTDIR}/srv/www/proximus/css
+	install -d ${DESTDIR}/srv/www/proximus/images
 	install -d ${DESTDIR}/srv/www/proximus/templates
 	install -d ${DESTDIR}/srv/www/proximus/templates/compile
 	 
 	install -m644 etc/cron.d/proximus ${DESTDIR}/etc/cron.d/proximus
-	install -m640 -o 13 -g 33 etc/proximus/proximus.conf ${DESTDIR}/etc/proximus/proximus.conf
+	install -m644 etc/proximus/proximus.conf ${DESTDIR}/etc/proximus/proximus.conf
 	install -m644 usr/share/proximus/* ${DESTDIR}/usr/share/proximus
-	chmod +x ${DESTDIR}/usr/share/proximus/proximus.py
-	chmod +x ${DESTDIR}/usr/share/proximus/proximus_noauth.php
-	install -m644 srv/www/proximus/forbidden.html ${DESTDIR}/srv/www/proximus
-	install -m644 srv/www/proximus/confirm.php    ${DESTDIR}/srv/www/proximus
+	chmod +x ${DESTDIR}/usr/share/proximus/proximus
 	install -m644 srv/www/proximus/proximus.php   ${DESTDIR}/srv/www/proximus
-	install -m644 srv/www/proximus/user.php       ${DESTDIR}/srv/www/proximus
-	install -m644 srv/www/proximus/img/logo.png   ${DESTDIR}/srv/www/proximus/img
-	install -m644 srv/www/proximus/templates/confirm.tpl ${DESTDIR}/srv/www/proximus/templates
+	install -m644 srv/www/proximus/css/style.css   ${DESTDIR}/srv/www/proximus/css
+	install -m644 srv/www/proximus/imgages/logo.png   ${DESTDIR}/srv/www/proximus/images
+	install -m644 srv/www/proximus/templates/proximus.tpl ${DESTDIR}/srv/www/proximus/templates
 	
 	
 	
@@ -75,9 +73,9 @@ binary-indep: build install
 	dh_fixperms
 	dh_installdeb
 	# fix some permissions
-	chown 13:33 ${DESTDIR}/etc/proximus/proximus.conf
+	chown proxy:www-data ${DESTDIR}/etc/proximus/proximus.conf
 	chmod 440 ${DESTDIR}/etc/proximus/proximus.conf
-	chown 33:33 ${DESTDIR}/srv/www/proximus/templates/compile
+	chown www-data:www-data ${DESTDIR}/srv/www/proximus/templates/compile
 	
 	dh_gencontrol
 	dh_md5sums
