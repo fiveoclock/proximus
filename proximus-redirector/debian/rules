@@ -41,6 +41,7 @@ install: build
 	# directories
 	install -d ${DESTDIR}/etc/proximus
 	install -d ${DESTDIR}/usr/share/proximus
+	install -d ${DESTDIR}/usr/share/apscheduler
 	install -d ${DESTDIR}/srv/www/proximus
 	install -d ${DESTDIR}/srv/www/proximus/css
 	install -d ${DESTDIR}/srv/www/proximus/images
