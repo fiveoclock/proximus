@@ -156,7 +156,7 @@ class Proximus:
    # set timezone according to settings
    def set_timezone(self):
       if "timezone" in settings :
-         if ( settings['timezone'] != '' ) :
+         if settings['timezone'] :
             self.db_query("SET time_zone = %s", ( settings['timezone']) )
             cursor = self.db_query ("SELECT CURTIME() AS now")
             time = cursor.fetchone()
@@ -472,7 +472,7 @@ class Proximus:
       cmd = settings['reload_command']
       meth = settings['reload_method']
 
-      if ( metH == "command" ) and ( cmd ) :
+      if ( meth == "command" ) and ( cmd ) :
          s.log("Attention, going to reload squid now, using: + " + cmd )
          status, output = commands.getstatusoutput( cmd )
          s.log("Attention, output of reload command: " + output )

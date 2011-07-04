@@ -76,6 +76,7 @@ binary-indep: build install
 	dh_installdeb
 	# fix some permissions
 	chown proxy:www-data ${DESTDIR}/etc/proximus/proximus.conf
+	chown proxy:proxy ${DESTDIR}/var/lib/proximus
 	chmod 444 ${DESTDIR}/etc/proximus/proximus.conf
 	chown www-data:www-data ${DESTDIR}/srv/www/proximus/templates/compile
 	
