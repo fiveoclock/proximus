@@ -1,4 +1,4 @@
-<img src="https://github.com/fiveoclock/proximus/raw/master/proximus-redirector/srv/www/proximus/img/logo.png" />
+<img src="https://github.com/fiveoclock/proximus/raw/master/proximus-redirector/srv/www/proximus/images/logo.png" />
 
 ProXimus is an open source enterprise scale solution to manage access control for the Squid proxy server http://www.squid-cache.org/. 
 
