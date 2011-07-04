@@ -41,21 +41,22 @@ install: build
 	# directories
 	install -d ${DESTDIR}/etc/proximus
 	install -d ${DESTDIR}/usr/share/proximus
-	install -d ${DESTDIR}/usr/share/apscheduler
+	install -d ${DESTDIR}/usr/share/proximus/apscheduler
 	install -d ${DESTDIR}/srv/www/proximus
 	install -d ${DESTDIR}/srv/www/proximus/css
 	install -d ${DESTDIR}/srv/www/proximus/images
 	install -d ${DESTDIR}/srv/www/proximus/templates
 	install -d ${DESTDIR}/srv/www/proximus/templates/compile
 	 
-	install -m644 etc/cron.d/proximus ${DESTDIR}/etc/cron.d/proximus
+	install -m644 etc/cron.d/proximus ${DESTDIR}/etc/cron.d/
 	install -m644 etc/proximus/proximus.conf ${DESTDIR}/etc/proximus/proximus.conf
-	install -m644 usr/share/proximus/* ${DESTDIR}/usr/share/proximus
+	install -m644 usr/share/proximus/proximus ${DESTDIR}/usr/share/proximus/
 	chmod +x ${DESTDIR}/usr/share/proximus/proximus
-	install -m644 srv/www/proximus/proximus.php   ${DESTDIR}/srv/www/proximus
-	install -m644 srv/www/proximus/css/style.css   ${DESTDIR}/srv/www/proximus/css
-	install -m644 srv/www/proximus/imgages/logo.png   ${DESTDIR}/srv/www/proximus/images
-	install -m644 srv/www/proximus/templates/proximus.tpl ${DESTDIR}/srv/www/proximus/templates
+	cp -r usr/share/proximus/apscheduler ${DESTDIR}/usr/share/proximus/
+	install -m644 srv/www/proximus/proximus.php   ${DESTDIR}/srv/www/proximus/
+	install -m644 srv/www/proximus/css/style.css   ${DESTDIR}/srv/www/proximus/css/
+	install -m644 srv/www/proximus/imgages/logo.png   ${DESTDIR}/srv/www/proximus/images/
+	install -m644 srv/www/proximus/templates/proximus.tpl ${DESTDIR}/srv/www/proximus/templates/
 	
 	
 	
@@ -75,7 +76,7 @@ binary-indep: build install
 	dh_installdeb
 	# fix some permissions
 	chown proxy:www-data ${DESTDIR}/etc/proximus/proximus.conf
-	chmod 440 ${DESTDIR}/etc/proximus/proximus.conf
+	chmod 444 ${DESTDIR}/etc/proximus/proximus.conf
 	chown www-data:www-data ${DESTDIR}/srv/www/proximus/templates/compile
 	
 	dh_gencontrol
