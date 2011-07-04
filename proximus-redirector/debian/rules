@@ -55,7 +55,7 @@ install: build
 	cp -r usr/share/proximus/apscheduler ${DESTDIR}/usr/share/proximus/
 	install -m644 srv/www/proximus/proximus.php   ${DESTDIR}/srv/www/proximus/
 	install -m644 srv/www/proximus/css/style.css   ${DESTDIR}/srv/www/proximus/css/
-	install -m644 srv/www/proximus/imgages/logo.png   ${DESTDIR}/srv/www/proximus/images/
+	install -m644 srv/www/proximus/images/logo.png   ${DESTDIR}/srv/www/proximus/images/
 	install -m644 srv/www/proximus/templates/proximus.tpl ${DESTDIR}/srv/www/proximus/templates/
 	
 	
