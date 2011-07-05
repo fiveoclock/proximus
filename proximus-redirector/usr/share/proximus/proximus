@@ -24,6 +24,13 @@ import commands
 
 import ConfigParser
 
+try:
+   import psyco
+   psyco.full()
+except ImportError, e:
+   None
+
+
 class Proximus:
    config_filename = "/etc/proximus/proximus.conf"
    passthrough_filename = "/etc/proximus/passthrough"
@@ -975,11 +982,9 @@ class Proximus:
             elif rule['policy'] == "LEARN" :
                s.learn()
                return s.grant()
-         else :
-            s.debug("Req  "+ str(s.req_id) +": Rule doesn't match; " + pprint.pformat(rule), 4)
+         #else : s.debug("Req  "+ str(s.req_id) +": Rule doesn't match; " + pprint.pformat(rule), 4)  # impact on performance is too high so dont use this
 
-      s.debug("Req  "+ str(s.req_id) +": no rule found; using default deny", 2)
-
+      s.debug("Req  "+ str(s.req_id) +": no rule found; using default allow", 2)
       # allow access if no rule did match until here ;-)
       return s.grant()
 
