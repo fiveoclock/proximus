@@ -390,8 +390,6 @@ class Proximus:
    # makes a query and saves the result in the cache
    # should not be used directly
    def db_query_cache_update(self, sql, args=None, conn=None) :
-      if conn == None : conn = self.get_db()
-
       cursor = self.db_query(sql, args, conn)
       if cursor is not None:
          result = cursor.fetchall()
