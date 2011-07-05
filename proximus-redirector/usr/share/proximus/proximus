@@ -379,7 +379,7 @@ class Proximus:
             return self.db_query_cache_update(sql, args, conn)
          # if cachetime is not yet over return from cache
          else :
-            self.debug("Data from cache..", 9)
+            #self.debug("Data from cache..", 9)
             return self.cache[sql + args_key]['result']
       # if we don't have it in cache, save it
       else :
@@ -396,7 +396,6 @@ class Proximus:
       if cursor is not None:
          result = cursor.fetchall()
          self.cache[sql + str(args)] = {'time': int(time.time()), 'result': result }
-         self.debug("Number of cached queries: " + str(len(self.cache)), 8)
          return result
       else:
          return None
