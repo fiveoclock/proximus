@@ -122,7 +122,7 @@ elseif ( isset($_GET['action'] ) ) {
    }
 
 
-   if ($action == "DENY" ) {
+   if ($action == "deny" ) {
      $site = $_GET["site"];
      $body = "
       <center>
