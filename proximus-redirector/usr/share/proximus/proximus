@@ -1008,27 +1008,29 @@ if __name__ == "__main__":
    if not options['cachetime'] :
       del options['cachetime']
 
-
-   if options['updatelists'] :
-      options['debug'] = 2
-      options['interactive'] = True
-      sr = Proximus(options)
-      sr.update_lists()
-   elif options['auth'] :
-      sr = Proximus(options)
-      sr.run_auth()
-   elif options['test'] :
-      options['debug'] = 1
-      options['interactive'] = True
-      sr = Proximus(options)
-      sr.run_testmode()
-   elif options['verifyconfig'] :
-      options['debug'] = 2
-      options['interactive'] = True
-      sr = Proximus(options)
-      sr.verify_config()
-   else:
-      sr = Proximus(options)
-      sr.run()
-
+   try :
+      if options['updatelists'] :
+         options['debug'] = 2
+         options['interactive'] = True
+         sr = Proximus(options)
+         sr.update_lists()
+      elif options['auth'] :
+         sr = Proximus(options)
+         sr.run_auth()
+      elif options['test'] :
+         options['debug'] = 1
+         options['interactive'] = True
+         sr = Proximus(options)
+         sr.run_testmode()
+      elif options['verifyconfig'] :
+         options['debug'] = 2
+         options['interactive'] = True
+         sr = Proximus(options)
+         sr.verify_config()
+      else:
+         sr = Proximus(options)
+         sr.run()
+   except KeyboardInterrupt, e :
+      sys.stdout.write('\n')
+      sys.exit(0)
 
