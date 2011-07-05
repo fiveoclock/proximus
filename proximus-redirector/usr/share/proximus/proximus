@@ -304,7 +304,7 @@ class Proximus:
 
    # returns the correct index number for the database pool for each thread
    def get_db_index(self):
-      if threading.current_thread().name == "MainThread" :
+      if threading.currentThread().name == "MainThread" :
          return 0
       else :
          return 1
