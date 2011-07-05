@@ -1008,10 +1008,6 @@ if __name__ == "__main__":
    if not options['debug'] :
       del options['debug']
 
-   # delete cache value if it was not set
-   if not options['cachetime'] :
-      del options['cachetime']
-
    try :
       if options['updatelists'] :
          options['debug'] = 2
