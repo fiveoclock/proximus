@@ -105,10 +105,10 @@ class Proximus:
          config['list_update_interval'] = 60
 
       # update_interval
-      if config.has_key("cache_time") :
-         config['cache_time'] = int(config['cache_time'])
+      if config.has_key("cachetime") :
+         config['cachetime'] = int(config['cachetime'])
       else :
-         config['cache_time'] = 60
+         config['cachetime'] = 60
 
       settings = config
       #pprint.pprint(settings)  ## debug
@@ -202,7 +202,43 @@ class Proximus:
          line = self._readline()
 
 
-   def check_config(self):
+   def run_testmode(self):
+      self._writeline("")
+      if settings['passthrough'] == True :
+         self._writeline("Passthrough mode active....")
+      self.req_id = 0
+      while True:
+         self._writeline('Enter URL and username (eg. "http://www.example.com testuser") : ', False )
+         url_user = self._readline()
+         try:
+            url, user = url_user.split(" ")
+         except ValueError, e :
+            self._writeline(' > wrong format\n' )
+            continue;
+
+         if url.startswith("http://") :
+            method = "GET"
+         else :
+            method = "CONNECT"
+
+         self._writeline('Enter the source IP [10.0.9.9] : ', False )
+         ip = self._readline()
+         if not ip:
+            ip = "10.0.9.9"
+
+         #http://www.example.com/ 10.0.9.32/- internet GET - myip=10.0.128.185 myport=3128
+         tmpl = "%s %s/- %s %s - myip=10.1.1.1 myport=3128"
+         request = tmpl % (url, ip, user, method)
+         self._writeline(' > Request : ' + request )
+
+         result = self.check_request( request )
+         if result == "" :
+            self._writeline(' > allowed \n' )
+         else :
+            self._writeline(' > Result  : ' + result + '\n')
+
+
+   def verify_config(self):
       settings['db_pass'] = "***"
       pprint.pprint(settings)
       self._writeline("")
@@ -219,8 +255,11 @@ class Proximus:
       "Returns one unbuffered line from squid."
       return self.stdin.readline()[:-1]
 
-   def _writeline(self,s):
-      self.stdout.write(s+'\n')
+   def _writeline(self, s, newline=True):
+      if newline :
+         self.stdout.write(s+'\n')
+      else :
+         self.stdout.write(s)
       self.stdout.flush()
 
    def log(s, str):
@@ -319,7 +358,7 @@ class Proximus:
    def db_query_cache(self, sql, args=None, conn=None) :
       if conn == None : conn = self.get_db()
 
-      if settings['cache_time'] <= 0 :
+      if settings['cachetime'] <= 0 :
          # if cache is turned off send do a query
          cursor = self.db_query(sql, args, conn)
          return cursor.fetchall()
@@ -327,11 +366,11 @@ class Proximus:
       args_key = str(args)
       # if key is in cache 
       if sql + args_key in self.cache :
-         # if cache_time is over update the query cache
-         if ( int(time.time()) - self.cache[sql + args_key]['time'] ) > settings['cache_time'] :
+         # if cachetime is over update the query cache
+         if ( int(time.time()) - self.cache[sql + args_key]['time'] ) > settings['cachetime'] :
             self.debug("Data from db - update..", 9)
             return self.db_query_cache_update(sql, args, conn)
-         # if cache_time is not yet over return from cache
+         # if cachetime is not yet over return from cache
          else :
             self.debug("Data from cache..", 9)
             return self.cache[sql + args_key]['result']
@@ -360,7 +399,7 @@ class Proximus:
    def verify_cache(self) :
       self.debug("Queries in cache: " + str( len(self.cache) ), 8)
       for key,entry in self.cache.items() :
-         if ( int(time.time()) - entry['time'] ) > settings['cache_time'] :
+         if ( int(time.time()) - entry['time'] ) > settings['cachetime'] :
             del self.cache[key]
 
 
@@ -950,10 +989,12 @@ if __name__ == "__main__":
    import argparse
    parser = argparse.ArgumentParser(description='ProXimus redirector - This program is intended to be integrated into squid, alternatively use the options listed below.')
    parser.add_argument('-u', '--updatelists', action='store_true', help='Updates noauth lists and exits')
-   parser.add_argument('-c', '--checkconfig', action='store_true', help='Check config and database connection and exit')
+   parser.add_argument('-v', '--verifyconfig', action='store_true', help='Check config and database connection and exit')
    parser.add_argument('-a', '--auth', action='store_true', help='Run ProXimus in authenticator mode')
    parser.add_argument('-d', '--debug', action='store', help='Set debbuging level', type=int, default=0, metavar='N')
    parser.add_argument('-i', '--interactive', action='store_true', help='Write everything to stdout; only for testing')
+   parser.add_argument('-c', '--cachetime', action='store', help='Time in seconds to keep queries in cache; 0 to turn it off', type=int, default=0, metavar='N')
+   parser.add_argument('-t', '--test', action='store_true', help='Interactive test mode; find out what rule matches.. not implemented yet')
 
    args = parser.parse_args()
    options = vars(args)
@@ -963,6 +1004,11 @@ if __name__ == "__main__":
    if not options['debug'] :
       del options['debug']
 
+   # delete cache value if it was not set
+   if not options['cachetime'] :
+      del options['cachetime']
+
+
    if options['updatelists'] :
       options['debug'] = 2
       options['interactive'] = True
@@ -971,11 +1017,16 @@ if __name__ == "__main__":
    elif options['auth'] :
       sr = Proximus(options)
       sr.run_auth()
-   elif options['checkconfig'] :
+   elif options['test'] :
+      options['debug'] = 1
+      options['interactive'] = True
+      sr = Proximus(options)
+      sr.run_testmode()
+   elif options['verifyconfig'] :
       options['debug'] = 2
       options['interactive'] = True
       sr = Proximus(options)
-      sr.check_config()
+      sr.verify_config()
    else:
       sr = Proximus(options)
       sr.run()
