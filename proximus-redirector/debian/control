@@ -12,7 +12,7 @@ Dm-Upload-Allowed: yes
 Package: proximus
 Architecture: all
 Depends: squid|squid3, python, python-mysqldb, python-argparse
-Recommends: apache2, libapache2-mod-php5, php5-mysql, smarty
+Recommends: python-psyco, apache2, libapache2-mod-php5, php5-mysql, smarty
 Description: Flexible management interface for squid proxy
  Proximus is a flexible management interface for squid proxy
  .
