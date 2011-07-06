@@ -858,7 +858,7 @@ class Proximus:
 
 
    # tests if a sitename matches
-   def check_sitename(s, sitename, rule):
+   def check_site(s, sitename, rule):
       if rule.startswith("regex:") :
          # if its a regex rule strip off the prefix
          regex = re.sub("^regex:", "", rule)
@@ -969,7 +969,7 @@ class Proximus:
                   ORDER BY priority DESC, location_id",
                   (user['group_id'], user['location_id'], request['protocol']))
       for rule in rules:
-         if s.check_sitename( request['sitename'], rule['sitename'] ) :
+         if s.check_site( request['sitename'], rule['sitename'] ) :
             s.debug("Req  "+ str(s.req_id) +": Rule found; " + pprint.pformat(rule), 2)
             if rule['policy'] == "ALLOW" :
                return s.grant()
@@ -997,9 +997,9 @@ if __name__ == "__main__":
    parser.add_argument('-u', '--updatelists', action='store_true', help='Updates noauth lists and exits')
    parser.add_argument('-v', '--verifyconfig', action='store_true', help='Check config and database connection and exit')
    parser.add_argument('-a', '--auth', action='store_true', help='Run ProXimus in authenticator mode')
-   parser.add_argument('-d', '--debug', action='store', help='Set debbuging level', type=int, default=0, metavar='N')
+   parser.add_argument('-d', '--debug', action='store', help='Set debbuging level', type=int, metavar='N')
    parser.add_argument('-i', '--interactive', action='store_true', help='Write everything to stdout; only for testing')
-   parser.add_argument('-c', '--cachetime', action='store', help='Time in seconds to keep queries in cache; 0 to turn it off', type=int, default=0, metavar='N')
+   parser.add_argument('-c', '--cachetime', action='store', help='Time in seconds to keep queries in cache; 0 to turn it off', type=int, metavar='N')
    parser.add_argument('-t', '--test', action='store_true', help='Interactive test mode; find out what rule matches.. not implemented yet')
 
    args = parser.parse_args()
@@ -1007,8 +1007,12 @@ if __name__ == "__main__":
    #pprint.pprint(options)
 
    # delete debug option if it was not set
-   if not options['debug'] :
+   if options['debug'] is None :
       del options['debug']
+
+   # delete cache option if it was not set
+   if options['cachetime'] is None :
+      del options['cachetime']
 
    try :
       if options['updatelists'] :
