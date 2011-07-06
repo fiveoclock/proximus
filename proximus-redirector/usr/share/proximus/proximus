@@ -1,13 +1,16 @@
 #!/usr/bin/python -u
 
+import argparse
 import sys,string
 import time
+import syslog
+import os, signal
+
+import ConfigParser
 import MySQLdb
 import MySQLdb.cursors
-import os, signal
 import socket
 import struct
-import syslog
 import pprint # for debugging
 
 import re
@@ -22,8 +25,8 @@ import logging  # apscheduler needs this when it has an exception
 import hashlib
 import commands
 
-import ConfigParser
 
+# try to import psyco if it is available
 try:
    import psyco
    psyco.full()
@@ -414,6 +417,21 @@ class Proximus:
          return False
       else :
          return True
+
+
+   # store additional values in the cache
+   def cache_set_var(self, sql, args=None, key=None, value=None) :
+      if sql + str(args)  in self.cache :
+         self.cache[sql + str(args)][key] = value
+         return True
+      return False
+
+
+   # get somthing from the cache
+   def cache_get_var(self, sql, args=None, key=None) :
+      if sql + str(args)  in self.cache :
+         if key in self.cache[sql + str(args)] :
+            return self.cache[sql + str(args)][key]
 
 
    ################
@@ -857,6 +875,56 @@ class Proximus:
          return False;
 
 
+   # find a rule that matches the request
+   def check_rules(s, user, request):
+      sql = "SELECT id, sitename, policy, location_id, group_id, priority, description \
+               FROM rules \
+               WHERE \
+                     ( group_id = %s \
+                     OR group_id = 0 ) \
+                  AND \
+                     ( location_id = %s \
+                     OR location_id = 1 ) \
+                  AND \
+                     ( protocol = %s \
+                     OR protocol = '*' ) \
+                  AND \
+                     ( starttime is NULL AND endtime is NULL \
+                     OR starttime <= NOW() AND NOW() <= endtime ) \
+               ORDER BY priority DESC, location_id"
+               #(user['group_id'], user['location_id'], request['protocol']))
+
+      # try to remember what I did the last time with this request
+      rule = s.cache_get_var( sql, (user['group_id'], user['location_id'], request['protocol']), request['sitename'] )
+      # if nothing came to my mind, query the database
+      if rule is None :
+         rules = s.db_query_cache ( sql, (user['group_id'], user['location_id'], request['protocol']) )
+         # find the best rule and remember it
+         for rule in rules:
+            if s.check_site( request['sitename'], rule['sitename'] ) :
+               s.debug("Req  "+ str(s.req_id) +": Rule found; " + pprint.pformat(rule), 2)
+               s.cache_set_var( sql, (user['group_id'], user['location_id'], request['protocol']), request['sitename'], rule )
+               break
+
+      if rule is not None :
+         if rule['policy'] == "ALLOW" :
+            return s.grant()
+         elif rule['policy'].startswith("REDIRECT") :
+            request['redirection_method'] = rule['policy']
+            return s.redirect()
+         elif rule['policy'] == "DENY_MAIL" :
+            return s.deny_mail_user()
+         elif rule['policy'] == "DENY" :
+            return s.deny()
+         elif rule['policy'] == "LEARN" :
+            s.learn()
+            return s.grant()
+         #else : s.debug("Req  "+ str(s.req_id) +": Rule doesn't match; " + pprint.pformat(rule), 4)  # impact on performance is too high so dont use this
+      else :
+         s.debug("Req  "+ str(s.req_id) +": no rule found; using default allow", 2)
+         return False
+
+
    # tests if a sitename matches
    def check_site(s, sitename, rule):
       if rule.startswith("regex:") :
@@ -878,6 +946,7 @@ class Proximus:
          return True
       else :
          return False
+
 
    # check if it is a blocked network
    def check_blocked_network(s, src_ip):
@@ -913,16 +982,12 @@ class Proximus:
          return s.takeHome()
 
 
-      ######
-      ## Global blocked network check
-      ##
+      # Global blocked network check
       if s.check_blocked_network( request['src_address'] ) :
          return s.deny()
 
 
-      ######
-      ## Global no-auth check
-      ##
+      # Global no-auth check
       if user == None :
          # since squid is configured to require user auth
          # and no user identification is sent the site must be in the no-auth table
@@ -946,53 +1011,16 @@ class Proximus:
          #   return grant()
 
 
-      ######
-      ## retrieve rules for user
-      ##
-
-      # check if we could retrieve user information
+      # rules check
       if user['id'] != None :
-         rules = s.db_query_cache ("SELECT id, sitename, policy, location_id, group_id, priority, description \
-                  FROM rules \
-                  WHERE \
-                        ( group_id = %s \
-                        OR group_id = 0 ) \
-                     AND \
-                        ( location_id = %s \
-                        OR location_id = 1 ) \
-                     AND \
-                        ( protocol = %s \
-                        OR protocol = '*' ) \
-                     AND \
-                        ( starttime is NULL AND endtime is NULL \
-                        OR starttime <= NOW() AND NOW() <= endtime ) \
-                  ORDER BY priority DESC, location_id",
-                  (user['group_id'], user['location_id'], request['protocol']))
-      for rule in rules:
-         if s.check_site( request['sitename'], rule['sitename'] ) :
-            s.debug("Req  "+ str(s.req_id) +": Rule found; " + pprint.pformat(rule), 2)
-            if rule['policy'] == "ALLOW" :
-               return s.grant()
-            elif rule['policy'].startswith("REDIRECT") :
-               request['redirection_method'] = rule['policy']
-               return s.redirect()
-            elif rule['policy'] == "DENY_MAIL" :
-               return s.deny_mail_user()
-            elif rule['policy'] == "DENY" :
-               return s.deny()
-            elif rule['policy'] == "LEARN" :
-               s.learn()
-               return s.grant()
-         #else : s.debug("Req  "+ str(s.req_id) +": Rule doesn't match; " + pprint.pformat(rule), 4)  # impact on performance is too high so dont use this
+         return s.check_rules(user, request)
 
-      s.debug("Req  "+ str(s.req_id) +": no rule found; using default allow", 2)
       # allow access if no rule did match until here ;-)
       return s.grant()
 
 
 
 if __name__ == "__main__":
-   import argparse
    parser = argparse.ArgumentParser(description='ProXimus redirector - This program is intended to be integrated into squid, alternatively use the options listed below.')
    parser.add_argument('-u', '--updatelists', action='store_true', help='Updates noauth lists and exits')
    parser.add_argument('-v', '--verifyconfig', action='store_true', help='Check config and database connection and exit')
