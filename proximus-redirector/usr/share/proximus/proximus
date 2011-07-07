@@ -155,7 +155,7 @@ class Proximus:
       # catch error if no settings are stored;
       # and activate passthrough mode
       except Exception, e :
-         s.debug("get_settings_from_db - exception: " + str(e), 1)
+         self.debug("get_settings_from_db - exception: " + str(e), 1)
          error_msg = "ERROR: please make sure that a config for this node is stored in the database. Table-name: proxy_settings - Full qualified domain name: " + fqdn_hostname + "; "
          self.log("ERROR: activating passthrough-mode until config is present")
          self.log(error_msg)
@@ -221,7 +221,9 @@ class Proximus:
          self._writeline('Enter URL and username (eg. "http://www.example.com testuser") : ', False )
          url_user = self._readline()
          try:
-            url, user = url_user.split(" ")
+            elements = url_user.split(" ")
+            url = elements[0]
+            user = elements[1]
          except ValueError, e :
             self._writeline(' > wrong format\n' )
             continue;
