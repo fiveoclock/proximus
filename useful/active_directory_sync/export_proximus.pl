@@ -192,7 +192,9 @@ sub updateUser {
       username     = \"$username\" AND
       realname     = \"$realname\" AND
       emailaddress = \"$email\" AND
-      location_id  = \"$loc\"") or dieMsg("Can't prepare CHECK query");
+      location_id  = \"$loc\" AND
+      active       = \"Y\"
+      ") or dieMsg("Can't prepare CHECK query");
    $chk->execute or dieMsg("Can't execute CHECK query");
 
    if(@result = $chk->fetchrow_array()) {
